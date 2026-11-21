@@ -51,7 +51,7 @@ test('all nineteen interactions reveal the supplied thank-you text in order', ()
     state=act(state,view.activeAction).state;
   }
   assert.equal(messages.length,19);
-  assert.equal(messages.join(' '),config.letter.join(' '),'the journey must preserve all supplied words');
+  assert.equal(messages.join(' '),config.interactionMessages.join(' '),'the journey must preserve the ordered interaction messages');
 });
 
 test('optional object interactions give thanks without consuming the next story message', () => {
@@ -82,4 +82,13 @@ test('side messages choose an available corner away from the current object',()=
     assert.ok(position.y>=0&&position.y+ch<=h);
     assert.ok(point.x<position.x||point.x>position.x+cw||point.y<position.y||point.y>position.y+ch,'message covers the active object center');
   }
+});
+
+
+test('optional thank-you messages stay independent of the invitation wording',()=>{
+  const view={chapter:1,step:0,activeAction:'chair'};
+  const invitation={letter:['Everyone is invited.'],interactionMessages:['Thank you for being here.']};
+  assert.equal(gratitudeMessage(view,'fan',invitation),'Thank you for being here.');
+  invitation.letter=['Bring a friend to graduation.'];
+  assert.equal(gratitudeMessage(view,'fan',invitation),'Thank you for being here.');
 });

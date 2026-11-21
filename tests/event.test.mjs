@@ -41,3 +41,26 @@ test('calendar rejects impossible dates rather than moving them into another mon
   assert.equal(lib.eventDates({start: '2028-02-29T24:00:00Z', end: '2028-03-01T02:00:00Z'}), null);
   assert.ok(lib.eventDates({start: '2028-02-29T10:00:00+07:00', end: '2028-02-29T12:00:00+07:00'}));
 });
+
+test('the invitation shows its confirmed start without inventing an end', () => {
+  assert.equal(typeof lib.eventStart, 'function');
+  const event = {start: '2026-11-26T13:30:00+07:00', end: ''};
+  assert.equal(lib.eventStart(event)?.toISOString(), '2026-11-26T06:30:00.000Z');
+  assert.equal(lib.eventDates(event), null);
+  assert.equal(lib.createCalendar(event), null);
+});
+
+test('a malformed end does not hide a valid invitation start', () => {
+  assert.equal(typeof lib.eventStart, 'function');
+  const event = {start: '2026-11-26T13:30:00+07:00', end: 'unknown'};
+  assert.equal(lib.eventStart(event)?.toISOString(), '2026-11-26T06:30:00.000Z');
+  assert.equal(lib.eventDates(event), null);
+});
+
+test('an invitation start needs a real date and explicit timezone offset', () => {
+  assert.equal(typeof lib.eventStart, 'function');
+  for (const value of ['', '2026-11-26T13:30:00', '2026-02-30T13:30:00+07:00', '2026-11-26T24:00:00+07:00']) {
+    assert.equal(lib.eventStart({start: value}), null);
+  }
+  assert.equal(lib.eventStart({}), null);
+});

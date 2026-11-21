@@ -18,8 +18,12 @@ function parseEventDate(value) {
   return Number.isFinite(+date) ? date : null;
 }
 
+export function eventStart(event) {
+  return parseEventDate(event?.start);
+}
+
 export function eventDates(event) {
-  const start = parseEventDate(event?.start);
+  const start = eventStart(event);
   const end = parseEventDate(event?.end);
   if (!start || !end || end <= start) return null;
   return {start, end};

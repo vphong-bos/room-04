@@ -1,3 +1,5 @@
+import {composeFreeWorld} from './discovery-props.mjs';
+
 // Room 04. Original, locally built geometry. +Y is up and openings face +Z.
 const PI=Math.PI;
 const C={
@@ -17,6 +19,18 @@ function workshop(T) {
   const motions = [];
   const liveGroups = new Set([root]);
   const disposedInstances = [];
+  const adopted = new Set();
+  function adopt(object) {
+    object.traverse(node=>{
+      if(node.geometry) adopted.add(node.geometry);
+      for(const material of Array.isArray(node.material)?node.material:node.material?[node.material]:[]) {
+        adopted.add(material);
+        for(const value of Object.values(material)) if(value?.isTexture) adopted.add(value);
+      }
+    });
+    return object;
+  }
+  function keep(object) { liveGroups.add(object); return object; }
   const color = new T.Color();
   const neutral = new T.MeshStandardMaterial({color:0xffffff, roughness:0.92});
   const geometry = (key, make) => {
@@ -169,7 +183,7 @@ function workshop(T) {
       function collect(node) {
         for (const child of [...node.children]) {
           if (liveGroups.has(child)) continue;
-          if (child.isMesh && !child.material.map) {
+          if (child.isMesh && !child.material.map && !child.material.transparent) {
             if (!batches.has(child.geometry)) batches.set(child.geometry,[]);
             batches.get(child.geometry).push(child);
           } else collect(child);
@@ -195,10 +209,11 @@ function workshop(T) {
     geometries.forEach(obj=>obj.dispose());
     paints.forEach(obj=>obj.dispose());
     textures.forEach(obj=>obj.dispose());
+    adopted.forEach(obj=>obj.dispose());
     neutral.dispose();
     root.clear();
   }
-  return {T,root,group,form,box,ball,cylinder,ring,rod,rounded,extrusion,mark,animate,houseNumber,surface,sheet,hose,targets,finish,dispose,
+  return {T,root,group,adopt,keep,form,box,ball,cylinder,ring,rod,rounded,extrusion,mark,animate,houseNumber,surface,sheet,hose,targets,finish,dispose,
     update(t,dt,{reducedMotion=false}={}){for(const motion of motions) motion(reducedMotion?0:t);}};
 }
 
@@ -365,7 +380,7 @@ function fishPlate(k,p,x,y,z,r=.20) {
 }
 
 function exterior(k,v) {
-  const rear=v.step>=2, scene=k.root, doorX=rear?.14:-.17;
+  const rear=v.freeExploration?v.location==='back':v.step>=2, scene=k.root, doorX=rear?.14:-.17;
   const wallEnd=2.56, frontZ=-.35;
   const windows=rear?[-2.15]:[-2.39];
   const openings=[{x:doorX,w:1.13,b:0,t:2.13},
@@ -401,7 +416,7 @@ function exterior(k,v) {
   k.box(scene,doorX,2.109,frontZ-.60,1.16,.048,1.32,0x676b60);
   k.box(scene,doorX-.61,1.04,frontZ-.66,.12,2.12,1.34,0x7d8274);
   openingTrim(k,scene,doorX,frontZ+.097,1.13,0,2.13,0xc9c9bc);
-  const leaf=wallLeaf(k,scene,doorX,frontZ+.13,1.095,2.10,rear?-.87:v.step===1?.40:0,rear,rear?C.agedDoor:0xb5b8a6);
+  const leaf=wallLeaf(k,scene,doorX,frontZ+.13,1.095,2.10,rear?(v.freeExploration?(v.flags.backdoor?-.87:0):-.87):v.step===1?.40:0,rear,rear?C.agedDoor:0xb5b8a6);
   if(!rear) {
     chair(k,scene,doorX+.47,.055,frontZ-.51,1.37,0x899080);
     k.mark('frontdoor','Front door',leaf,[.75,1.22,.045]);
@@ -431,7 +446,7 @@ function exterior(k,v) {
     const blade=k.box(path,x,.008,z,.012,.007,.04+.033*(i%4),i%3?0xa5a787:0xb6b59a);
     blade.rotation.y=.2+.58*Math.sin(i*3.13);
   }
-  if(v.step===1) k.mark('sidepath','Walked-flat grass',path,[.035,.008,1.84]);
+  if(v.step===1||v.freeExploration) k.mark('sidepath','Walked-flat grass',path,[.035,.008,1.84]);
   if(!rear) {
     const seat=ground(k,chair(k,scene,-1.39,0,frontZ+.82,-.38),-.009);
     k.mark('chair','Blue plastic chair',seat,[.08,.91,-.242]);
@@ -440,9 +455,9 @@ function exterior(k,v) {
     k.box(scene,-2.47,.05,frontZ+.46,1.32,.1,.55,0xa9aa9a);
     k.box(scene,1.74,.39,frontZ+.15,.18,.23,.11,0xb8bbb0);
   }
-  return rear?{position:[4.75,2.37,12.05],target:[.03,1.24,-.30],width:5.30,height:3.73}
-    :v.step===1?{position:[5.65,2.42,11.55],target:[.70,1.40,-.21],width:6.31,height:4.21}
-    :{position:[3.48,2.45,12.53],target:[.03,1.81,-.14],width:7.09,height:5.05};
+  return rear?{position:[1.2,1.62,3.0],target:[.2,1.1,-.5],fov:58,width:5.30,height:3.73}
+    :v.step===1?{position:[3.7,1.62,3.9],target:[1.3,1.0,-.6],fov:58,width:6.31,height:4.21}
+    :{position:[1.0,1.62,5.4],target:[-.7,1.2,-.35],fov:58,width:7.09,height:5.05};
 }
 
 function floorGrid(k,p,width,depth,x,z,y,spacing,tint) {
@@ -450,12 +465,22 @@ function floorGrid(k,p,width,depth,x,z,y,spacing,tint) {
   for(let j=-depth/2;j<=depth/2;j+=spacing) k.box(p,x,y,z+j,width,.003,.010,tint);
 }
 
+function roomEnvelope(k,p,width,depth,z) {
+  // Complete the surfaces visible at the edges of a first-person view.
+  k.box(p,0,3.22,z+depth/2,width+.20,.16,depth,0xd2cfc1);
+  for(const side of[-1,1]){
+    const x=side*width/2;
+    k.box(p,x,1.57,z+depth/2,.20,3.14,depth,C.cream);
+    k.box(p,x,.505,z+depth/2,.21,1.01,depth,C.band);
+  }
+}
+
 function indoorShell(k,p,holes,z=-1.75) {
   perforatedWall(k,p,-9,9,z,3.14,holes);
   // The walls and floor continue beyond the photograph in both directions.
   k.surface(p,'floor',0xc6c6b8,0,-.009,z+7,26,14,true);
   floorGrid(k,p,17,13,0,z+6.5,-.005,.55,0xadafa3);
-  k.box(p,0,3.24,z+.65,19,.16,1.61,0xd2cfc1);
+  roomEnvelope(k,p,18,14,z);
 }
 
 function towel(k,p,x,y,z,w=.48,angle=0) {
@@ -589,10 +614,10 @@ function corridor(k,v) {
     step<6?cup(k,sink.g,-.30,.982,-.022,0xc5c5b1,.45):cup(k,sink.g,.18,.953,.17,0xc5c5b1,.59);
   if(step===2) mug.rotation.y=-.45;
   if(step>=2 && step<=6) k.mark('cup','Cup',mug,[0,.115,0]);
-  if(step>=3&&step<=5) return {position:[2.96,4.05,6.89],target:[1.70,1.25,-1.17],width:2.10,height:1.55};
-  if(step===6) return {position:[3.60,4.69,11.04],target:[1.62,1.56,-1.65],width:2.94,height:2.02};
-  if(step===7) return {position:[1.75,2.00,10.8],target:[-2.06,1.07,-1.86],width:3.86,height:2.72};
-  return {position:[1.06,2.54,11.8],target:[-.38,1.09,-.94],width:5.58,height:3.16};
+  if(step>=3&&step<=5) return {position:[2.15,1.52,.65],target:[1.6,1.14,-1.12],fov:55,width:2.10,height:1.55,contextTargets:['cup','pattern']};
+  if(step===6) return {position:[1.76,1.62,.45],target:[1.76,1.4,-4.2],fov:58,width:2.94,height:2.02};
+  if(step===7) return {position:[-1.5,1.62,1.9],target:[-2.72,1.1,-2.5],fov:58,width:3.86,height:2.72};
+  return {position:[-.1,1.62,2.9],target:[-.65,1.12,-1.0],fov:58,width:5.58,height:3.16,contextTargets:['fan','tape']};
 }
 
 function curtain(k,p,x,z,width,phase) {
@@ -637,7 +662,7 @@ function plant(k,p,x,y,z,kind,scale=1) {
 }
 
 function footwear(k,p,x,y,z,angle,tint=0x9d9889) {
-  const g=k.group(p,x,y,z);g.rotation.y=angle;
+  const g=k.group(p,x,y,z);g.name='shoe';g.rotation.y=angle;
   k.rounded(g,0,.030,.018,.181,.037,.369,.077,0x85877d);
   k.ball(g,0,.066,.059,.087,.047,.144,tint);
   k.ball(g,0,.094,-.058,.080,.071,.099,tint);
@@ -654,7 +679,7 @@ function pool(k,v) {
   const panes=[{x:-2.47,w:1.74,b:.76,t:2.14},{x:-.51,w:1.72,b:.76,t:2.14}];
   const portal={x:1.83,w:1.26,b:0,t:2.24};
   perforatedWall(k,p,-8.5,8.5,z,3.14,[...panes,portal]);
-  k.box(p,0,3.23,z+.58,17,.15,1.64,0xd2cfc0);
+  roomEnvelope(k,p,17,8.2,z);
   k.surface(p,'exterior',0xc0c5b0,-2,-.16,-6.12,30,12,true);
   waterFloor(k,p,0,.065,1.52,20,9.8,.38);
   k.box(p,0,.036,z+.13,14,.12,.22,0xb5beb3);
@@ -691,8 +716,8 @@ function pool(k,v) {
   // Dark canvas toes break the surface in the foreground.
   footwear(k,p,-.92,-.023,1.91,2.96);
   footwear(k,p,-.58,-.023,1.86,3.24);
-  return v.step===0?{position:[2.32,2.53,10.17],target:[-.60,1.02,-.84],width:5.17,height:3.10}
-    :{position:[2.64,2.42,10.45],target:[.39,1.00,-.99],width:5.65,height:3.14};
+  return {position:[.1,1.62,4.2],target:v.step===0?[-.35,.9,-.65]:[1.1,1.05,-.95],
+    fov:60,width:5.65,height:3.14,contextTargets:['cup']};
 }
 
 function photographicPrint(k,p,x,y,z,angle=0) {
@@ -738,11 +763,11 @@ function bench(k,p,x,z,step) {
 
 function tableRoom(k,v) {
   const p=k.root,step=v.step,z=-1.73;
-  const win={x:.32,w:2.51,b:.80,t:2.28};
+  const win={x:.32,w:2.51,b:.50,t:2.28};
   indoorShell(k,p,[win],z);
   openingTrim(k,p,win.x,z+.106,win.w,win.b,win.t);
   sash(k,p,win.x,(win.b+win.t)/2,z+.117,win.w,win.t-win.b,0,false);
-  k.box(p,win.x,.763,z+.18,win.w+.20,.082,.38,0xc8c1b0);
+  k.box(p,win.x,win.b-.037,z+.18,win.w+.20,.082,.38,0xc8c1b0);
   k.surface(p,'yard',C.cement,0,-.028,-7.83,22,12,true);
   k.surface(p,'soil',C.grass,0,-.035,-18.20,55,10,true);
   // A scored joint, a narrow border and the return of the hose continue the
@@ -753,8 +778,8 @@ function tableRoom(k,v) {
   k.hose(p,[[-2.68,-.002,-5.51],[-1.71,-.002,-5.85],[-.82,-.002,-6.62],
     [.17,-.002,-6.83],[1.14,-.002,-6.64],[2.93,-.002,-6.97]],.014,0x7c8975);
   // Both heel openings are on the far side; the toes point back at the house.
-  footwear(k,p,.09,-.013,-4.89,-.083,0x9d9480);
-  footwear(k,p,.33,-.013,-4.84,.045,0x9d9480);
+  footwear(k,p,.09,-.013,-3.89,-.083,0x9d9480);
+  footwear(k,p,.33,-.013,-3.84,.045,0x9d9480);
   const tableX=-.43,tableZ=.06,top=.778;
   plankTable(k,p,tableX,tableZ,1.94,.93,top,0xa08466);
   chair(k,p,tableX,-.001,-.80,0,0x969884);
@@ -768,7 +793,7 @@ function tableRoom(k,v) {
   if(step===0) k.mark('photo','Photograph beneath the bench',print,[.055,.008,.058]);
   if(step>=1) k.mark(step===1?'turnphoto':'photo','Photograph',print,[.044,.012,.051]);
   if(step<=2) {
-    const strip=cardboard(k,p,.83,.809,z+.26,1,-.12);
+    const strip=cardboard(k,p,.83,win.b+.009,z+.26,1,-.12);
     if(step===2) k.mark('cardboard','Cardboard on the sill',strip,[.066,.005,.033]);
   }else {
     const folded=step===3?cardboard(k,p,tableX+.71,.015,1.24,1,-.09):
@@ -776,19 +801,29 @@ function tableRoom(k,v) {
     if(step<=4) k.mark('fold','Cardboard at the bench leg',folded,[.046,.006*(step===4?2:1),.040]);
   }
   if(step===5) k.mark('sit','Bench',seat,[.063,.473,.058]);
-  if(step===6) return {position:[2.11,5.43,8.82],target:[.33,.99,-1.86],width:3.20,height:2.33};
-  if(step===1) return {position:[2.04,3.21,8.21],target:[-.05,.82,.18],width:2.85,height:2.04};
-  if(step===3||step===4) return {position:[step===3?2.24:2.81,1.50,8.25],
-    target:[.02,.480,.86],width:1.78,height:1.43};
-  if(step===2) return {position:[2.39,3.04,10.97],target:[.02,1.01,-.48],width:3.69,height:2.68};
-  return {position:[2.57,2.70,10.98],target:[-.38,.88,-.10],width:4.63,height:2.95};
+  if(step===6) return {position:[-.08,1.24,1.16],target:[.13,.65,-3.8],fov:60,width:3.20,height:2.33,contextTargets:['photo','cup']};
+  if(step===1) return {position:[.1,1.62,2.65],target:[-.05,.8,.18],fov:58,width:2.85,height:2.04,contextTargets:['cup']};
+  if(step===3||step===4) return {position:[1.1,1.05,2.65],target:[.25,.1,1.12],fov:60,width:1.78,height:1.43,contextTargets:['cup','photo']};
+  if(step===2) return {position:[.25,1.62,2.95],target:[.45,1.0,-.65],fov:58,width:3.69,height:2.68,contextTargets:['cup','photo']};
+  if(step===5) return {position:[.2,1.5,2.8],target:[-.35,.5,.94],fov:58,width:4.63,height:2.95,contextTargets:['cup','photo']};
+  return {position:[.3,1.62,3.8],target:[-.25,.76,.05],fov:58,width:4.63,height:2.95,contextTargets:['cup']};
 }
 
 export function buildWorld(THREE,view) {
   const k=workshop(THREE);
+  if(view.freeExploration) {
+    const camera=composeFreeWorld(k,view,{C,ground,chair,caseBag,exterior,openingTrim,wallLeaf,sash,indoorShell,roomEnvelope,perforatedWall,leftPassage,plankTable,fan,basin,cup,plant,fishPlate,towel,waterFloor,curtain,footwear,photographicPrint,cardboard,bench});
+    camera.projection='perspective';
+    k.finish();
+    return {root:k.root,targets:k.targets,camera,background:C.sky,update:k.update,dispose:k.dispose};
+  }
   const chapters=[exterior,corridor,pool,tableRoom];
   const compose=chapters[Math.max(0,Math.min(3,view.chapter|0))];
   const camera=compose(k,view);
+  camera.projection='perspective';
+  // Keep the view close and stop wide displays or head turns exposing the set edges.
+  camera.maxHorizontalFov=74;
+  camera.dragLimit=view.chapter===0?.20:.16;
   const frameBounds=(min,max)=>[min[0],max[0]].flatMap(x=>
     [min[1],max[1]].flatMap(y=>[min[2],max[2]].map(z=>[x,y,z])));
   // These story details still matter when there is no interaction on them.
@@ -797,14 +832,20 @@ export function buildWorld(THREE,view) {
       ...frameBounds([-.39,-.009,-.19],[.39,.82,.18]).map(([x,y,z])=>
         [-2.32+x*Math.cos(-.1)+z*Math.sin(-.1),y,.80-x*Math.sin(-.1)+z*Math.cos(-.1)])];
   if(view.chapter===1&&view.step===6)
-    camera.context=frameBounds([.70,1.02,-1.56],[2.81,2.36,-1.56]);
+    camera.context=[[3.2,-1.42,-14.5]];
   if(view.chapter===2)
-    camera.context=[...frameBounds([-.91,.013,-.38],[-.19,.96,.30]),
-      ...frameBounds([-1.10,-.023,1.65],[-.40,.17,2.15])];
-  if(view.chapter===3&&view.step===6){
-    camera.context=frameBounds([-.04,-.013,-5.12],[.46,.16,-4.61]);
-    camera.dragLimit=.12;
+    camera.context=frameBounds([-.91,.013,-.38],[-.19,.96,.30]);
+  if(view.chapter===2||(view.chapter===3&&view.step===6)){
+    // Derive the shoe bounds from the actual geometry before static instancing.
+    k.root.updateMatrixWorld(true);
+    camera.context??=[];
+    for(const shoe of k.root.getObjectsByProperty('name','shoe')){
+      const bounds=new THREE.Box3().setFromObject(shoe,true);
+      camera.context.push(...frameBounds(bounds.min.toArray(),bounds.max.toArray()));
+    }
   }
+  if(view.chapter===3&&view.step===6)camera.dragLimit=.12;
   k.finish();
   return {root:k.root,targets:k.targets,camera,background:C.sky,update:k.update,dispose:k.dispose};
 }
+

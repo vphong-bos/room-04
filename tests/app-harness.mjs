@@ -16,15 +16,6 @@ export const appHarness = function appHarness(app,html,configSource,dependencies
     querySelector(selector){if(selector==='[data-close]')return this.closeButton??=new Element();if(selector==='svg')return this.svg??=new Element();return null;}
     getBoundingClientRect(){
       const height=options.height||844,width=options.width||390;
-      if(this.id==='gratitude-card'){
-        const shortLandscape=height<=500&&width>=height;
-        const compact=this.classList.contains('is-compact')||shortLandscape;
-        const w=compact?Math.min(280,width/2-24):Math.min(280,width-32);
-        const length=nodes.get('gratitude-message')?.textContent.length||0;
-        const h=Math.min(shortLandscape?height-96:Math.min(320,height*.42),60+Math.ceil(length/Math.max(8,(w-32)/7))*22);
-        const left=parseFloat(this.style.left)||width-w-16,top=parseFloat(this.style.top)||68;
-        return {left,top,right:left+w,bottom:top+h,width:w,height:h};
-      }
       if(this.id==='reopen-letter')return {top:16,bottom:54,left:14,right:130,width:116,height:38};
       return {top:0,bottom:height,left:0,right:width,width,height};
     }
@@ -36,23 +27,22 @@ export const appHarness = function appHarness(app,html,configSource,dependencies
   for(const match of html.matchAll(/<[^>]*\bid="([^"]+)"[^>]*>/g)){
     const element=new Element(match[1]);element.hidden=/\bhidden\b/.test(match[0]);nodes.set(match[1],element);
   }
-  const card=nodes.get('gratitude-card');
-  if(card)card.append(nodes.get('gratitude-dismiss'),nodes.get('gratitude-message'));
   for(const match of html.matchAll(/<dialog id="([^"]+)"/g))dialogs.push(nodes.get(match[1]));
   document={activeElement:null,body:new Element('body'),hidden:false,getElementById:id=>nodes.get(id),
     createElement:tag=>new Element('',tag),querySelectorAll:selector=>selector==='dialog'?dialogs:[],
     querySelector:selector=>selector==='dialog[open]'?dialogs.find(d=>d.open)||null:selector==='.quiet-controls'?{getBoundingClientRect:()=>({bottom:54})}:null,
     addEventListener(){}};
   const win={addEventListener(){}};new Function('window',configSource)(win);
-  const env={...dependencies,window:win,document,matchMedia:()=>({matches:options.reducedMotion!==false,addEventListener(){}}),
-    localStorage:{getItem:key=>key==='room04:journey:v2'?options.savedState||null:null,setItem(){}},location:{search:''},URLSearchParams:class{get(){return null;}},
+  if(options.resizeObserver)win.ResizeObserver=class{observe(element){if(!element)throw Error('ResizeObserver target is absent');}};
+  const env={...dependencies,ResizeObserver:win.ResizeObserver,window:win,document,matchMedia:()=>({matches:options.reducedMotion!==false,addEventListener(){}}),
+    localStorage:{getItem:key=>key==='room04:journey:v4'?options.savedState||null:key==='room04:journey:v3'?options.v3SavedState||null:key==='room04:journey:v2'?options.legacySavedState||null:null,setItem(){}},location:{search:''},URLSearchParams:class{get(){return null;}},
     performance:{now:()=>clock},getComputedStyle:()=>({paddingLeft:'0px',paddingRight:'0px',paddingBottom:'0px'}),
     requestAnimationFrame:fn=>{fn();return 1;},setTimeout:(fn,delay)=>{timers.set(++nextTimer,{fn,delay,due:clock+(Number(delay)||0)});return nextTimer;},clearTimeout:id=>timers.delete(id),
-    setInterval:()=>1,clearInterval(){},MODEL_SOURCES:[]};
+    setInterval:()=>1,clearInterval(){},MODEL_SOURCES:[],MODEL_ASSET_SOURCES:[]};
   const cutoff=app.indexOf("\nboot().catch(");
   if(cutoff<0)throw Error('Missing boot boundary');
   const body=app.slice(0,cutoff).replace(/^import .*;\n/gm,'');
-  const api=new Function(...Object.keys(env),body+"\nreturn {interact,drawView,showWriting,showPhotograph,getState:()=>state,getTargets:()=>targets};")(...Object.values(env));
+  const api=new Function(...Object.keys(env),body+"\nreturn {interact,drawView,showWriting,showPhotograph,getState:()=>state,getTargets:()=>targets,getLookState:()=>({yaw:dragGoal,pitch:typeof pitchGoal==='number'?pitchGoal:0})};")(...Object.values(env));
   api.drawView(dependencies.getView(api.getState()),true);
   function advance(ms){
     const end=clock+ms;let count=0;

@@ -37,15 +37,27 @@ export function fitSceneCamera(camera, config, width, height, focus, insets, con
   if (!(width > 0 && height > 0)) return null;
   camera.updateMatrixWorld(true);
   const point = focus?.clone().applyMatrix4(camera.matrixWorldInverse);
-  // Fitting the full desktop width here made portrait rooms into thumbnails.
   const points = context.map(p => p.clone().applyMatrix4(camera.matrixWorldInverse));
   for (const point of config.context || [])
     points.push(camera.position.clone().fromArray(point).applyMatrix4(camera.matrixWorldInverse));
-  const fit = framing(width, height, config.height || 5, point, insets, points);
-  camera.left = fit.x - fit.across / 2;
-  camera.right = fit.x + fit.across / 2;
-  camera.top = fit.y + fit.span / 2;
-  camera.bottom = fit.y - fit.span / 2;
+  if (camera.isPerspectiveCamera) {
+    const slope = p => ({x:p.x/-p.z,y:p.y/-p.z});
+    const visible = points.filter(p => p.z < -camera.near);
+    const span=Math.min(2*Math.tan((config.fov||58)*Math.PI/360),
+      2*Math.tan((config.maxHorizontalFov||78)*Math.PI/360)*height/width);
+    const fit = framing(width,height,span,
+      point&&point.z < -camera.near?slope(point):null,insets,visible.map(slope));
+    camera.aspect=width/height;
+    camera.projectionMatrix.makePerspective(
+      (fit.x-fit.across/2)*camera.near,(fit.x+fit.across/2)*camera.near,
+      (fit.y+fit.span/2)*camera.near,(fit.y-fit.span/2)*camera.near,
+      camera.near,camera.far,camera.coordinateSystem);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    return fit.frame;
+  }
+  const fit = framing(width,height,config.height||5,point,insets,points);
+  camera.left=fit.x-fit.across/2;camera.right=fit.x+fit.across/2;
+  camera.top=fit.y+fit.span/2;camera.bottom=fit.y-fit.span/2;
   camera.updateProjectionMatrix();
   return fit.frame;
 }
@@ -88,4 +100,10 @@ export function hitSceneTarget(raycaster, root, targets) {
 
 export function renderPixelRatio(width, height, deviceRatio = 1) {
   return Math.min(deviceRatio || 1, 1.6, Math.sqrt(2600000 / Math.max(1, width * height)));
+}
+
+export function framingContext(config,targets,activeAction){
+  if(config.projection!=='perspective')return targets.map(target=>target.anchor);
+  const relevant=new Set([activeAction,...(config.contextTargets||[])]);
+  return targets.filter(target=>relevant.has(target.id)).map(target=>target.anchor);
 }

@@ -1,6 +1,17 @@
 # Room 04 — credits
 
-Keep these credits and the in-page credits when reusing the supplied previews. The playable geometry and SVG scenes are original constructions inspired by the user's story and references; they are not downloaded Sketchfab meshes.
+Keep these credits and the in-page credits when reusing the supplied previews. The rooms and SVG scenes are original constructions inspired by the user's story and references. The game also includes seven locally embedded CC0 meshes, described below. No downloaded Sketchfab meshes are included.
+
+## Obtained model meshes used in the game
+
+Seven additional model meshes are embedded in dist/model-assets.mjs for offline play. These are actual converted vertex/index data, not previews or procedural replacements.
+
+| Model | Creator | License / source |
+| --- | --- | --- |
+| Key, flower, boat, bottle, star, opening chest | Quaternius | CC0 1.0; original pack pages and exact pinned GLB files are recorded in the asset report |
+| Utah teapot | Martin Newell; edited by Yuki Koyama | CC0 1.0 as recorded in the source asset README; locally simplified to a faceted 1,523-triangle version |
+
+[The asset report](docs/room04/free-exploration-assets.md) includes each original pack page, exact obtained file, blob identifier, license evidence and conversion details. Six Quaternius models came through the public quaternius-showcase distribution; its model-license register distinguishes upstream CC0 models from the showcase code's MIT license. Total imported geometry is 2,857 triangles. Scene colors and glass materials are adapted, and the chest retains an opening lid.
 
 ## Seven Sketchfab references
 
@@ -37,9 +48,9 @@ Fraunces, DM Sans, and Caveat use **SIL Open Font License 1.1**. Unmodified WOFF
 
 | Family | Use | License file |
 | --- | --- | --- |
-| Fraunces | Retained from the first edition; unused in the current interface | `fraunces-OFL.txt` |
-| DM Sans | Controls and source credits | `dm-sans-OFL.txt` |
-| Caveat | Blue-pen writing on the photograph | `caveat-OFL.txt` |
+| Fraunces | Graduation invitation heading | `fraunces-OFL.txt` |
+| DM Sans | Invitation text, controls and source credits | `dm-sans-OFL.txt` |
+| Caveat | Retained from the earlier handwritten interface; unused in the current invitation | `caveat-OFL.txt` |
 
 `dist/assets/licenses/fonts/SOURCES.txt` records the original download and license URLs. No font service is contacted by the game.
 
@@ -49,6 +60,12 @@ The six-chapter Room 04 story was supplied by the user and is reproduced in `doc
 
 The interactive adaptation, original 3D/SVG geometry, palette, favicon, interface, and default letter were created for this personal project. Original software is covered by the root MIT license. Third-party assets retain the licenses above.
 
-## Found photograph (current revision)
+## Graduation portrait (current revision)
+
+`dist/assets/story/graduation-portrait.png` is the user's supplied graduation portrait, copied unchanged from `/workspace/hihi.png`. It is shown on the front of the photograph. Rights remain with the portrait's owner and photographer.
+
+The earlier UIT venue photograph is no longer displayed. The invitation now links to the campus on Google Maps, using the location from UIT's [official contact page](https://tuyensinh.uit.edu.vn/content/lien-he).
+
+## Earlier found photograph (not displayed)
 
 `dist/assets/story/found-photograph.png` was generated for Room 04 and edited to follow the latest supplied scene: a large out-of-focus sleeve, part of a table, two cups and an ambiguous hand cut off at the edge. The selected file is unmodified after generation. It is fictional artwork, not a photograph of the user or their friends. The exact final generation/edit brief is in `docs/room04/revision-2/image-prompt.md`.

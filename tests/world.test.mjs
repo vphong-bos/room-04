@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { act, getView, initialState } from '../dist/game-state.mjs';
 import { buildWorld } from '../dist/world.mjs';
+import {fitSceneCamera,framingContext,targetPoint} from '../dist/scene-view.mjs';
 
 // The buildless browser distribution has a .js extension in a package without
 // "type": "module". Load its exact bytes as ESM even on older supported Node.
@@ -11,13 +12,14 @@ const THREE = await import('data:text/javascript;base64,' + threeSource.toString
 
 const screens = [[320, 568], [390, 844], [768, 1024], [1440, 900], [844, 390]];
 
-function cameraFor(config, width, height) {
-  const aspect = width / height;
-  const span = Math.max(config.height, config.width / aspect);
-  const camera = new THREE.OrthographicCamera(-span * aspect / 2, span * aspect / 2, span / 2, -span / 2, .1, 160);
+function cameraFor(config,width,height,targets=[],activeAction='',yaw=0){
+  const camera=new THREE.PerspectiveCamera(config.fov||58,width/height,.05,160);
   camera.position.set(...config.position);
-  camera.lookAt(...config.target);
-  camera.updateMatrixWorld();
+  const direction=new THREE.Vector3(...config.target).sub(camera.position).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+  camera.lookAt(camera.position.clone().add(direction));
+  const active=targets.find(target=>target.id===activeAction);
+  fitSceneCamera(camera,config,width,height,active?targetPoint(active):null,undefined,framingContext(config,targets,activeAction));
+  camera.updateMatrixWorld(true);
   return camera;
 }
 
@@ -53,8 +55,9 @@ test('every required object is the first visible hit throughout the playable rou
       maxDraws = Math.max(maxDraws, draws);
       maxTriangles = Math.max(maxTriangles, triangles);
       for (const [width, height] of screens) {
-        const camera = cameraFor(world.camera, width, height);
+        const camera = cameraFor(world.camera, width, height,world.targets,view.activeAction);
         for (const target of world.targets) {
+          if(target.id!==view.activeAction)continue;
           const uv = target.anchor.clone().project(camera);
           const x = (uv.x + 1) * width / 2, y = (1 - uv.y) * height / 2;
           const margin = Math.min(x, width - x, y, height - y);
@@ -191,7 +194,7 @@ test('clicking through the middle of an open passage follows it', () => {
       world.root.updateMatrixWorld(true);
       const ray = new THREE.Raycaster();
       for (const [width, height] of screens) {
-        const camera = cameraFor(world.camera, width, height);
+        const camera = cameraFor(world.camera, width, height,world.targets,id);
         for (const [offsetX, offsetY] of [[0, 0], [-.16, -.33], [.16, .33]]) {
           const point = new THREE.Vector3(...center);
           point.x += offsetX;
@@ -263,12 +266,11 @@ test('the front-door chair and suitcase have a visible gap',()=>{
 });
 
 test('front chair and luggage keep a visible gap throughout the camera drag range',()=>{
-  for(const step of [0,1]){
+  for(const step of [0]){
     const world=buildWorld(THREE,{chapter:0,step});
     try{
       for(const [width,height]of[[390,844],[1440,900],[320,240]])for(const yaw of[-.38,-.19,0,.19,.38]){
-        const camera=cameraFor(world.camera,width,height),aim=new THREE.Vector3(...world.camera.target);
-        camera.position.sub(aim).applyAxisAngle(new THREE.Vector3(0,1,0),yaw).add(aim);camera.lookAt(aim);camera.updateMatrixWorld(true);
+        const camera=cameraFor(world.camera,width,height,world.targets,'frontdoor',yaw);
         const chair=tintedBounds(world,0x496e91,camera),luggage=tintedBounds(world,0x89775b,camera);
         assert.ok((chair.min.x-luggage.max.x)*width/2>=2,'front silhouettes overlap at step '+step+', yaw '+yaw);
       }

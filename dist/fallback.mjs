@@ -531,7 +531,7 @@ function bench(step) {
     </g>`;
 }
 
-function finalTable(add) {
+function finalTable(add, showLetter = true, markShoes = artwork => artwork) {
   add('photo', 'Photograph', 585, 623);
   add('cup', 'Cup', 741, 591);
   return `
@@ -544,7 +544,7 @@ function finalTable(add) {
     <path d="m251 408 695-83v144H251Z" fill="#d0ccb9"/>
     <path d="m262 414 684-82m-573 134 573-98m-334 26 44 72m170-95 51 98" fill="none" stroke="#a8a691" opacity=".78"/>
     <path d="m268 262 175-3m325-24 178-11m-660 134 81-13m473-65 75-8" fill="none" stroke="#7c8d75" opacity=".52"/>
-    ${group(657, 415, `
+    ${markShoes(group(657, 415, `
       ${shadow(0, 11, 54, 13, .14)}
       <path d="M-37-26q7-11 20-7 7 2 7 19l6 20q2 14-14 17-23 5-27-10-2-11 3-20z" fill="#696d61"/>
       <path d="M4-26q8-11 20-8 7 2 7 16l8 18q5 13-11 17-21 5-27-8-4-10 1-24z" fill="#757666"/>
@@ -552,7 +552,7 @@ function finalTable(add) {
       <path d="M-44 12q11 7 38-2m8-2q15 4 36-3" stroke="#b3ae97" stroke-width="2" fill="none"/>
       <path d="M-40 3q11-7 26-4l4 10q-13 7-30 4zm45-4q13-9 24-6l6 9q-13 7-29 5z" fill="#838171"/>
       <path d="m-36-11 17-3m-18 8 19-3m25-5 17-4m-16 8 18-3" stroke="#b4ad97" stroke-width="1.5"/>
-    `, .88, 7)}
+    `, .88, 7))}
     <path d="M242 0v469h711V0M515 0v468m259-467v468" fill="none" stroke="#d1cfbc" stroke-width="14"/>
     <path d="M246 17 949 21 246 300Z" fill="#f6f2dd" opacity=".15"/>
     <path d="m219 467 753-8 35 27-828 6z" fill="#e7deca"/>
@@ -562,8 +562,8 @@ function finalTable(add) {
     <path d="m310 558 539-7 273 249H24Z" fill="url(#r04-wood)"/>
     <path d="m323 567 524-5m-557 27 561-9m-593 43 440-8m84-3 132-3m-718 57 765-9m-850 80 929-14m-844-23 476-6" stroke="#d1bb98" fill="none" opacity=".32"/>
     <path d="m443 730 345-9m-548-54 201-4m437 68 87-3m-679 18 77-4" stroke="#705d45" fill="none" opacity=".35"/>
-    ${shadow(586, 625, 67, 17, .13)}
-    ${photograph(585, 622, 1.66, -7)}
+    ${showLetter ? shadow(586, 625, 67, 17, .13) : ''}
+    ${showLetter ? photograph(585, 622, 1.66, -7) : ''}
     ${mug(741, 604, 1.34)}
   `;
 }
@@ -607,6 +607,7 @@ const scenes = [exterior, interior, pool, table];
 const backgrounds = ['url(#r04-sky)', '#e0dbc9', '#d1d3bf', '#dfd9c8'];
 
 export function buildFallback(view) {
+  if (view.freeExploration) return buildFreeFallback(view);
   const {chapter} = view;
   const targets = [];
   const add = (id, label, x, y) => targets.push({id, label, x, y});
@@ -619,3 +620,398 @@ export function buildFallback(view) {
   </svg>`;
   return {svg, targets};
 }
+
+
+// One fixed drawing per physical room; alternate poses transform that complete
+// drawing and its action anchors together. Doors and furniture never rearrange.
+const freeLabels = {
+  frontdoor:'Locked front door',sidepath:'Path around the house',hose:'Garden hose',
+  returnfront:'Return to the front',backdoor:'Back door',key:'Small brass key',
+  enterhouse:'Enter the house',tea:'Make tea',cup:'Cup',fan:'Wall fan',
+  tape:'Tape on the desk',pattern:'Blue fish dish',window:'Garden window',
+  left:'Hallway to the table room',outside:'Back outside',returntea:'Return to the tea room',
+  duck:'Tiny duck',flower:'Flower pot',boat:'Paper boat',jar:'Little jar',
+  windmill:'Garden windmill',star:'Hanging star',chest:'Small tabletop chest',
+  sit:'Sit at the table',photo:'Found photograph',turnphoto:'Turn the photograph',returnroom:'Stand up',
+};
+const freeProp = (name,artwork,state = '') =>
+  '<g data-prop="' + name + '"' + (state?' data-state="' + state + '"':'') + '>' + artwork + '</g>';
+const freeObject = (name,x,y,artwork,attributes = '') =>
+  '<g data-prop="' + name + '" data-world-x="' + x + '" data-world-y="' + y + '"' +
+  (attributes?' ' + attributes:'') + '>' + artwork + '</g>';
+function freeRoute(x, y, direction = 'left', scale = 1) {
+  const angle = {left:0,right:180,up:90,down:-90}[direction] || 0;
+  return group(x, y, `
+    <ellipse cy="6" rx="35" ry="13" fill="#575f4e" opacity=".12"/>
+    <path transform="rotate(${angle})" d="M19 0h-35m10-9-11 9 11 9"
+      fill="none" stroke="#d8d3b9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  `, scale);
+}
+
+function freeLock(x, y, scale = 1) {
+  return group(x,y,`
+    <path d="M-7-3v-6q0-10 7-10t7 10v6" fill="none" stroke="#716d56" stroke-width="4"/>
+    <path d="M-12-3h24v18h-24z" fill="#b29c69" stroke="#7b7358" stroke-width="1.5"/>
+    <circle cy="4" r="2" fill="#69624b"/><path d="M0 5v5" stroke="#69624b" stroke-width="2"/>
+  `,scale);
+}
+
+function freeBackHouse(open) {
+  return `
+    <path d="m44 302 228-126 924 31v360l-925 1-227-67z" fill="url(#r04-plaster)"/>
+    <path d="m44 302 228-126-1 392-227-67z" fill="#c1c1b2"/>
+    <path d="M23 287 205 134l204-87L272 178 34 311z" fill="#617363"/>
+    <path d="m409 47 743 15 95 147-975-31z" fill="url(#r04-roof)"/>
+    <path d="M467 53 337 180M584 56 468 184M711 58 605 188M838 60l-80 133m201-130-55 135m189-132-39 137"
+      stroke="#394f42" stroke-width="2.5" opacity=".43"/>
+    <path d="m19 311 253-133 975 31v17l-973-31-253 132z" fill="#515f50"/>
+    <path d="m44 479 228 68 928-6v23l-929 5-227-67z" fill="#a6a894"/>
+    <path d="m61 360 113-47v102l-113 26z" fill="#878f80" stroke="#d5d4c4" stroke-width="8"/>
+    ${houseWindow(410,366,.97)}
+    ${houseWindow(994,377,1.26)}
+    <path d="m587 558 194-1 27 30-245 1z" fill="#aea697"/>
+    <path d="m594 553 181-1 8 9-196 1z" fill="#e4dfd0"/>
+    <path d="M597 554V294l178 5v254" stroke="#b0af9e" stroke-width="17" fill="url(#r04-doorway)"/>
+    ${open ? `
+      <path d="m609 391 153 9v152H603z" fill="#a3ab90"/>
+      <path d="m621 483 130 6 16 64H605z" fill="#d1c5ad"/>
+      <path d="m604 301-82 36v235l82-24z" fill="#747b70"/>
+      <path d="m598 309-68 33v221l68-20z" fill="#a7ac9b"/>
+      <path d="m588 327-49 23v78l49-20zm-49 114 49-19v108l-49 16z" fill="none" stroke="#7e8776" stroke-width="2"/>
+      <path d="m539 474 13-4" stroke="#5f6356" stroke-width="5" stroke-linecap="round"/>
+      <text transform="translate(541 386) skewY(-22)" fill="#696d60" font-size="25" font-family="sans-serif">04</text>
+    ` : `
+      <path d="m605 306 161 4v237l-161 3z" fill="#8b9580"/>
+      <path d="m619 322 133 4v98l-133-2zm0 115 133 1v95l-133 3z" fill="none" stroke="#6a7a62" stroke-width="3"/>
+      <path d="m706 423h18" stroke="#bba47c" stroke-width="5" stroke-linecap="round"/>
+      <text x="669" y="368" fill="#d7d1b9" font-size="27" font-family="sans-serif" letter-spacing="2">04</text>
+      ${freeLock(716,444,.77)}
+    `}
+    <path d="M1030 515q-19 77 39 89t131 38m-173-125q-18 77 37 91t136 38"
+      fill="none" stroke="#636e5a" stroke-width="3"/>
+    <path d="m0 800 323-234 213-6-291 240z" fill="#a5a68d"/>
+    <path d="m365 604 151-29 80 17-128 44z" fill="#c6c2af"/>
+    <path d="m380 606 106-18m-66 43 65-17" fill="none" stroke="#aaa48d" opacity=".6"/>`;
+}
+
+function freeTeapot(x,y,brewed) {
+  return group(x,y,`
+    ${shadow(2,28,42,9,.16)}
+    <path d="M-27-10q-38-15-33 12 2 20 32 18" fill="none" stroke="#687568" stroke-width="9"/>
+    <path d="M-26-9q-24-9-24 9t23 12" fill="none" stroke="#bfc5ae" stroke-width="3"/>
+    <path d="m27-3 23-18 7 3-12 31-23 7" fill="#899a82" stroke="#667760" stroke-width="2"/>
+    <path d="M-32-16q-12 48 7 52 20 8 46-1 18-6 7-51z" fill="#b5bda3" stroke="#798b73" stroke-width="2"/>
+    <path d="M-26-10q-6 31 2 38" fill="none" stroke="#e1e2ca" stroke-width="4" opacity=".58"/>
+    <ellipse cy="-17" rx="32" ry="10" fill="#d5d7bd" stroke="#819278" stroke-width="2"/>
+    <path d="M-26-21q24-19 50 0" fill="#a3b096"/>
+    <path d="M-6-28q0-10 7-10 8 0 7 10" fill="#6e826b"/>
+    ${brewed ? '<path d="m43-3 5-10" stroke="#c3aa76" stroke-width="2"/>' : ''}
+  `,.79,-3);
+}
+
+function freeTeaCup(x,y,brewed,scale = .89) {
+  return group(x,y,`
+    ${mug(0,0,1)}
+    ${brewed ? freeProp('amber-tea','<ellipse cy="-16" rx="17" ry="5" fill="#ac7c39"/><path d="M-12-17q10-3 23 0" stroke="#dbc08a" stroke-width="1.4" fill="none"/>') : ''}
+    ${brewed ? freeProp('tea-steam',`
+      <g class="r04-motion r04-water-shift" fill="none" stroke="#f6f0dc" stroke-width="2.3" stroke-linecap="round" opacity=".8">
+        <path d="M-10-32q-11-13 0-26t-1-24M4-35q11-15 0-29t3-24M17-31q-8-12 1-25"/>
+      </g>`) : ''}
+  `,scale);
+}
+
+function freeTeaWindow(open) {
+  const garden = `
+    <path d="M-136-94H136V100H-136z" fill="url(#r04-sky)"/>
+    <path d="M-136-13Q-74-61-16-12q56-56 152-7v119h-272z" fill="#a0ac90"/>
+    <path d="M-136 43q105-40 272-22v79h-272z" fill="#c1bfa7"/>
+    <path d="m-136 63 272-17v41l-272 7z" fill="#92afa2"/>
+    <path d="m-136 65 272-16m-236 33 96-8m52 0 58-5" stroke="#d9dfc9" fill="none" opacity=".68"/>
+    <path d="M-136 14H136M-95 0v99M23-1v99M119 0v99" stroke="#81907a" stroke-width="3"/>`;
+  return group(985,244,freeProp('tea-window',`
+    <path d="M-146-103H146V105H-146z" fill="#8d927e"/>
+    ${garden}
+    ${open ? `
+      <path d="m-138-95-43 18v180l43-6zm276 0 39 19v178l-39-6z" fill="#aeb9a0" stroke="#89997f" stroke-width="3"/>
+      <path d="m-170-63 24-7v63l-24 7zm315-6 25 8v61l-25-7z" fill="#dce0cd" opacity=".63"/>
+      <path d="M-140-98H140V101H-140z" fill="none" stroke="#dedcc7" stroke-width="8"/>
+    ` : `
+      <path d="M-136-94H136V100H-136z" fill="#cfd6c4" opacity=".53"/>
+      <path d="M-139-94H139V100H-139zM-8-93V100M-138 9H138" fill="none" stroke="#dcd9c7" stroke-width="8"/>
+      <path d="M-130-85 125-85-130 77z" fill="#fff9e5" opacity=".2"/>
+    `}
+    <path d="m-148 97 294 1 13 13-317-1z" fill="#e6dfce"/>
+    <path d="m-158 110 317 1v8l-317-1z" fill="#a9a692"/>
+  `,open?'open':'closed'),1.2);
+}
+
+function freeChest(x,y,open) {
+  return group(x,y,`
+    ${shadow(3,73,119,16,.2)}
+    <path d="m-99-26 181-9 23 22v71l-184 18-20-22z" fill="#886f51" stroke="#685c46" stroke-width="2"/>
+    <path d="m-78-9 183-4v71L-78 76z" fill="#a28a62"/>
+    <path d="m-99-26 21 17v85l-21-22z" fill="#796249"/>
+    <path d="m-72 7 169-10m-168 28 169-10m-168 31 168-12" stroke="#776345" fill="none" stroke-width="2" opacity=".66"/>
+    <path d="m-56-10 14-1v81l-14 1zm105-3 14-1v75l-14 2z" fill="#7e8262"/>
+    <path d="m-52-8 5 0v76m100-79 5 0v74" stroke="#b6b090" stroke-width="1.5" opacity=".75"/>
+    ${open ? `
+      <path d="m-97-28 17-109 182-7 1 131z" fill="#796249" stroke="#5f5943" stroke-width="3"/>
+      <path d="m-86-35 15-91 162-6 1 109z" fill="#b49b70"/>
+      <path d="m-76-48 12-64 143-5v79z" fill="#847151"/>
+      <path d="m-55-137-9 109m110-114 2 116" stroke="#7c8464" stroke-width="12"/>
+      <path d="m-91-25 15-11 165-2 12 21-177 12z" fill="#4b5141"/>
+      <path d="m-73-20 47-6 48 11 57-6" stroke="#c1b590" stroke-width="3" fill="none" opacity=".45"/>
+    ` : `
+      <path d="M-99-27q-4-56 77-60 85-8 104 50l23 24L-78-9Z" fill="#b19a72" stroke="#71674b" stroke-width="2"/>
+      <path d="m-91-43 175-9m-161-16 149-5" fill="none" stroke="#8d7d59" stroke-width="2"/>
+      <path d="M-56-79q-13 23 0 60l14 1q-12-40 0-63zm105-1q12 20 14 66l-14 1q-2-40-13-65z" fill="#818667"/>
+      <path d="m6-16 15-1v23L6 8z" fill="#b4a575" stroke="#736e50"/>
+    `}
+    <path d="m6 10 15-1v15L6 26z" fill="#7b7959"/>
+    <path d="m9 14 9-1" stroke="#d0c092" stroke-width="2"/>
+  `,.34);
+}
+
+
+function freeGarden(anchor) {
+  return [
+    anchor('flower',856,304,freeObject('flower',856,304,group(856,318,`
+      ${shadow(0,14,34,7,.15)}
+      <path d="m-27-36 8 49h38l8-49z" fill="#a7876d" stroke="#8d7961" stroke-width="2"/>
+      <ellipse cy="-36" rx="29" ry="7" fill="#bb9f7d"/><ellipse cy="-37" rx="24" ry="4" fill="#6d7057"/>
+      <path d="M0-36v-63m-2 39-22-18m25 5 23-20" stroke="#637f58" stroke-width="3" fill="none"/>
+      <path d="M-8-58q-17-19-26-11 6 15 26 11m14-5q14-21 28-17-6 17-28 17" fill="#738d65"/>
+      <path d="M0-105q-19-17-17 0-19 5-1 12-5 17 11 6 16 14 14-4 18-5 0-14z" fill="#d4c6a7"/>
+      <circle cy="-98" r="5" fill="#a49365"/>
+    `,.34))),
+    anchor('duck',957,329,freeObject('duck',957,329,group(957,329,`
+      <ellipse cy="16" rx="36" ry="6" fill="#d9e1cd" opacity=".58"/>
+      <path d="M-29 0q13 19 41 7Q27 0 16-9L4-13q8-23-8-23-14 0-11 17l-6 11z" fill="#d7cba4" stroke="#a7a180" stroke-width="2"/>
+      <path d="m9-25 14 6-15 3" fill="#b69c6e"/><circle cx="1" cy="-26" r="2" fill="#50584a"/>
+      <path d="M-15-2q7 8 19 3" stroke="#b3aa84" stroke-width="2" fill="none"/>
+    `,.34))),
+    anchor('boat',1067,337,freeObject('boat',1067,337,group(1067,337,`
+      <ellipse cy="14" rx="39" ry="5" fill="#dbe3cd" opacity=".5"/>
+      <path d="m-40-4 38 14 38-14-12 19h-52z" fill="#ded7bc" stroke="#a9aa8f" stroke-width="2"/>
+      <path d="m-23-5 22-30 20 31-21 13z" fill="#f0e9d0"/>
+      <path d="M-1-35V9l20-13" fill="none" stroke="#b7b59a" stroke-width="2"/>
+    `,.34))),
+    anchor('jar',1127,354,freeObject('jar',1127,354,group(1127,354,`
+      ${shadow(0,26,30,7,.18)}
+      <path d="M-19-39v12q-9 7-8 39 0 18 27 18t27-18q1-31-8-39v-12z" fill="#bdc8af" stroke="#81977d" stroke-width="2" fill-opacity=".74"/>
+      <path d="M-19-39h38v8h-38z" fill="#b4a386"/>
+      <ellipse cy="11" rx="23" ry="7" fill="#8b9f81" opacity=".35"/>
+      <path d="M-17-19q-4 10-3 30" stroke="#e9e9ce" stroke-width="3" fill="none"/>
+    `,.34))),
+    anchor('windmill',1082,198,freeObject('windmill',1082,198,group(1082,198,`
+      <path d="m-8 7-8 74h33L8 7z" fill="#a89b7c" stroke="#7d8267" stroke-width="2"/>
+      <path d="M0-43V45m-44-44H44" stroke="#788b71" stroke-width="4"/>
+      <path d="M-4-41 8-39 6-5H-4zm14 33 32 5-3 12-30-8zM5 9 1 43-10 39l5-31zm-15-1-32-5 4-12 29 8z" fill="#d7d5b9" stroke="#98a183" stroke-width="2"/>
+      <circle r="7" fill="#8b9778"/>
+    `,.34))),
+    anchor('star',900,177,freeObject('star',900,177,group(900,177,`
+      <path d="M0-136V-22" stroke="#9b9e84" stroke-width="2"/>
+      <path d="m0-21 6 14 15 2-11 11 3 16-13-8-14 8 3-16-11-11 16-2z" fill="#d8cba0" stroke="#a9a17d" stroke-width="2"/>
+      <path d="M0-15v27L-14 3" fill="none" stroke="#eee3bd" stroke-width="2" opacity=".65"/>
+    `,.4))),
+  ].join('');
+}
+
+function freeHall(open) {
+  return '<g data-opening="hall" data-state="' + (open?'open':'closed') + '" data-world-x="239" data-world-y="405">' + `
+    <path d="M46 0h298l23 493H44Z" fill="#a6a797"/>
+    <path d="M66 73 321 95l14 392H66Z" fill="#777f70"/>
+    <path d="m66 76 169 119v251L66 489Z" fill="#939d85"/>
+    <path d="m235 195 86-100 14 392-100-41z" fill="#b1b29d"/>
+    ${open?`
+      <path d="m235 195 68-1 6 238-74 14z" fill="#d4d8bb"/>
+      <path d="m239 244 59 8 8 172-69 14z" fill="#a8b193"/>
+      <path d="m238 197-44 35 1 224 43-12z" fill="#8d9c7f"/>
+      <path d="m201 244 28-21v91l-27 12zm2 95 26-9v100l-25 7z" fill="none" stroke="#6a7d61" stroke-width="2"/>
+    `:`
+      <path d="m235 195 68-1 6 238-74 14z" fill="#99a58b"/>
+      <path d="m246 211 45-1 2 93-47 4zm0 109 47-4 4 103-49 9z" fill="none" stroke="#76856c" stroke-width="2"/>
+      <path d="m251 317 9-1" stroke="#b7a47b" stroke-width="4" stroke-linecap="round"/>
+    `}
+    <path d="m66 489 169-43 74-14 27 55-232 140-73-15z" fill="#b4b79c"/>
+    <path d="m66 357 169-18 74 6m-243 152 182-41 75 0m-229 71 170-56 68 1" fill="none" stroke="#686f60" opacity=".42"/>
+    <path d="m45 0 21 81v410l-22 11zM322 92l22-92 23 493-31-5z" fill="#d9d4c4"/>
+  ` + '</g>';
+}
+
+function freeTeaRoom(view,anchor) {
+  const f = view.flags || {};
+  return `
+    <path d="M0 0H1200V512H0Z" fill="url(#r04-wall)"/>
+    <path d="M0 0H1200L1164 53 348 68 63 40Z" fill="#d9d3c1"/>
+    <path d="M0 336 595 345l605-12v176H0Z" fill="#a4af97"/>
+    <path d="M0 491 595 499l605-8v18H0Z" fill="#858b77"/>
+    ${tileFloor(500)}
+    ${freeHall(!!f.window)}
+    ${anchor('left',239,405,'')}
+    <path d="m369 0 20 0 7 499-29-6zM397 332l33 2-3 151-31 6z" fill="#eee8da" opacity=".3"/>
+    <path d="m516 84 20 330m-154-119 27 2m-2 167 46 3" fill="none" stroke="#afa994" opacity=".34"/>
+    <g data-opening="outside" data-world-x="660" data-world-y="342">
+      <path d="m583 496 2-277 139 4v280" fill="url(#r04-doorway)" stroke="#c6c3b1" stroke-width="11"/>
+      <path d="m591 227 55 20v239l-56 8z" fill="#8e9a81"/>
+      <path d="m650 243 67-15v266l-67-9z" fill="#acb59c"/>
+      <path d="m653 392 63-7v105l-63-10z" fill="#b9b79c"/>
+      <path d="m652 393 62 1" stroke="#7f8b74" stroke-width="2"/>
+    </g>
+    ${anchor('outside',660,342,freeRoute(660,342,'up',.7))}
+    <path d="m1181 0-9 504 28 7V0Z" fill="#b9b5a5" opacity=".53"/>
+    ${freeTeaWindow(!!f.tea)}
+    <g opacity="${f.tea?1:.35}">${freeGarden(anchor)}</g>
+    ${anchor('window',986,277,'')}
+    ${anchor('returntea',985,385,freeProp('window-step',freeRoute(985,385,'down',.42)))}
+    ${f.tea?'<path d="m817 389 347-2 36 130-420-29z" fill="#faf0cd" opacity=".13"/>':''}
+    ${anchor('fan',440,191,wallFan())}
+    ${freeObject('tea-desk',397,403,desk)}
+    ${anchor('tape',347,410,'')}
+    ${freeObject('tea-chair',579,548,woodChair(579,548,.91,3))}
+    ${freeObject('tea-counter',950,450,counter)}
+    ${anchor('pattern',810,439,group(810,439,`
+      <ellipse rx="34" ry="11" fill="#e8e5d4" stroke="#aeb5a3" stroke-width="2"/>
+      ${fish(9,0,.72,-9)}<path d="m-29-3 25-4-10 12-13-2z" fill="#e9e2d1"/>
+    `))}
+    ${freeObject('static-tap',867,361,tap(902,415,2))}
+    ${anchor('tea',1101,419,freeProp('teapot',freeTeapot(1101,419,!!f.tea)))}
+    ${anchor('cup',1004,433,freeTeaCup(1004,437,!!f.tea,.89))}
+  `;
+}
+
+function freeOutsideShoes(x,y) {
+  return freeObject('outside-shoes',x,y,group(x,y,`
+    ${shadow(0,11,54,13,.14)}
+    <path d="M-37-26q7-11 20-7 7 2 7 19l6 20q2 14-14 17-23 5-27-10-2-11 3-20z" fill="#696d61"/>
+    <path d="M4-26q8-11 20-8 7 2 7 16l8 18q5 13-11 17-21 5-27-8-4-10 1-24z" fill="#757666"/>
+    <path d="M-36-24q5-8 14-6 6 3 6 12-9-4-20 3zm43-1q6-8 15-6 6 3 6 10-9-2-21 3z" fill="#4b514a"/>
+    <path d="M-44 12q11 7 38-2m8-2q15 4 36-3" stroke="#b3ae97" stroke-width="2" fill="none"/>
+    <path d="M-40 3q11-7 26-4l4 10q-13 7-30 4zm45-4q13-9 24-6l6 9q-13 7-29 5z" fill="#838171"/>
+    <path d="m-36-11 17-3m-18 8 19-3m25-5 17-4m-16 8 18-3" stroke="#b4ad97" stroke-width="1.5"/>
+  `,.88,7));
+}
+
+function freeTableWindow() {
+  return freeObject('table-window',640,230,`
+    <path d="M399 63H881V420H399z" fill="#929c85"/>
+    <path d="M412 76H868V408H412z" fill="url(#r04-sky)"/>
+    <path d="M412 232q100-41 186-14t270-14v204H412z" fill="#a1af93"/>
+    <path d="m412 346 456-53v115H412z" fill="#cfccb6"/>
+    <path d="m412 354 456-53m-442 90 442-56m-300 73 22-74m137 74-4-92" fill="none" stroke="#aaa991" stroke-width="1.6" opacity=".68"/>
+    ${freeOutsideShoes(690,380)}
+    <path d="M406 70H874V414H406zM562 72V412M716 72V412" fill="none" stroke="#d8d7c0" stroke-width="10"/>
+    <path d="m408 79 458-1-458 183z" fill="#f7f0da" opacity=".12"/>
+    <path d="m388 409 506-1 22 22-552 4z" fill="#e6ddc5"/>
+    <path d="m364 434 552-4v9l-552 5z" fill="#a4a18a"/>
+  `);
+}
+
+function freeTabletop() {
+  return freeObject('table',600,500,`
+    ${shadow(606,701,301,25,.15)}
+    <path d="m362 551-22 167m503-177 35 157m-420-246-8 142m304-149 23 146" fill="none" stroke="#736149" stroke-width="14"/>
+    <path d="m359 569-15 137m504-146 24 127" fill="none" stroke="#aa9471" stroke-width="4"/>
+    <path d="M444 435H755l128 105v18l-565 25v-19z" fill="#806951"/>
+    <path d="M444 435H755l128 105-565 24Z" fill="url(#r04-wood)"/>
+    <path d="m433 447 338-2m-376 29 401-4m-439 39 476-8m-493 43 533-18" fill="none" stroke="#d4bc94" stroke-width="2" opacity=".47"/>
+    <path d="m318 564 565-24m-558 34 550-23" fill="none" stroke="#66513d" stroke-width="2" opacity=".7"/>
+  `,'data-surface="table"');
+}
+
+function freeTableBench() {
+  return freeObject('table-bench',590,625,`
+    ${shadow(591,743,203,19,.16)}
+    <path d="m423 639-15 102 14 3 17-105zm328-6 12 103 14-2-10-105zm-256-3-4 90 12 1 7-90zm198-6 5 90 12-1-3-91z" fill="#79654a"/>
+    <path d="m403 626 334-20 43 28-359 27-18-14z" fill="#856d51"/>
+    <path d="m403 626 334-20 43 28-359 15z" fill="url(#r04-wood)"/>
+    <path d="m424 629 313-16m-302 29 319-20" fill="none" stroke="#c8ae86" stroke-width="2" opacity=".61"/>
+    <path d="m433 626 52-3 25 11-63 4z" fill="#d4c9af"/>
+  `);
+}
+
+function freeTableRoom(view,anchor) {
+  const f = view.flags || {};
+  return `
+    <path d="M0 0H1200V800H0Z" fill="url(#r04-wall)"/>
+    <path d="M0 0H1200L1120 57 285 67 63 38Z" fill="#d5cfbc"/>
+    <path d="M0 0 63 38v503L0 592Z" fill="#b9bba5"/>
+    <path d="M1200 0 1120 57v460l80 56Z" fill="#babca5"/>
+    <path d="M63 344 1120 339v185L63 543Z" fill="#a8b197"/>
+    <path d="M63 502 1120 492v33L63 543Z" fill="#89957e"/>
+    ${tileFloor(520)}
+    <g data-opening="arrival" data-world-x="169" data-world-y="400">
+      <path d="m75 159 182-7v398l-182 15z" fill="url(#r04-doorway)" stroke="#d5d0ba" stroke-width="12"/>
+      <path d="m86 175 160-7v367L86 548z" fill="#aab69a"/>
+      <path d="m86 365 160-7v177L86 548z" fill="#b0ad94"/>
+      <path d="m86 365 160-7" stroke="#829177" stroke-width="3"/>
+      <path d="m81 165-35 22v384l35-13z" fill="#87967b"/>
+    </g>
+    ${anchor('returntea',169,400,freeRoute(169,400,'left',.7))}
+    ${freeTableWindow()}
+    <path d="m417 441 470-2 71 260-610 17z" fill="#f6e7c4" opacity=".08"/>
+    ${freeObject('table-chair',980,601,woodChair(980,601,.9,6))}
+    ${freeObject('table-left-chair',287,616,woodChair(287,616,.78,-8))}
+    ${freeTabletop()}
+    ${anchor('chest',666,466,freeObject('chest',666,466,freeChest(666,466,!!f.chest),
+      'data-surface="table" data-size="0.32" data-state="' + (f.chest?'open':'closed') + '"'))}
+    ${f.chest?anchor('photo',666,535,freeObject('letter',666,535,photograph(666,535,.72,-3,!!f.writing),'data-surface="table"')):''}
+    ${f.chest?anchor('turnphoto',689,545,''):''}
+    ${anchor('cup',490,486,freeObject('table-mug',490,486,mug(490,486,.85)))}
+    ${freeTableBench()}
+    ${anchor('sit',590,625,'')}
+    ${anchor('returnroom',590,625,'')}
+  `;
+}
+
+function buildFreeFallback(view) {
+  const room = ['tea','window'].includes(view.location)?'tea':
+    ['treasure','ending'].includes(view.location)?'table':view.location;
+  const pose = view.location === 'window'?'window':view.location === 'ending'?'seated':'standing';
+  const camera = pose === 'window'?{scale:2.25,x:-1616.25,y:-189}:
+    pose === 'seated'?{scale:1.15,x:-90,y:-72}:{scale:1,x:0,y:0};
+  const anchors = new Map();
+  const anchor = (id,x,y,artwork) => {
+    const label = id === 'returntea' && pose === 'window'?'Step back from the window':freeLabels[id] || id;
+    anchors.set(id,{id,label,x:x*camera.scale+camera.x,y:y*camera.scale+camera.y,worldX:x,worldY:y});
+    return artwork;
+  };
+  const f = view.flags || {};
+  let artwork = '';
+  if(view.location === 'front') {
+    artwork = outsideGround + frontHouse(false) +
+      freeProp('front-door',freeLock(641,476,.73),'locked') +
+      anchor('frontdoor',604,444,'') +
+      anchor('sidepath',951,590,freeRoute(951,590,'right',.8)) +
+      anchor('hose',231,692,'');
+  } else if(view.location === 'back') {
+    artwork = outsideGround + freeProp('back-door',freeBackHouse(!!f.backdoor),f.backdoor?'open':'locked') +
+      anchor('backdoor',f.backdoor?539:714,f.backdoor?474:423,'') +
+      anchor('returnfront',231,650,freeRoute(231,650,'left',.9));
+    if(!f.key) artwork += anchor('key',454,612,freeProp('key',group(454,612,`
+      ${shadow(0,11,29,5,.18)}
+      <g transform="rotate(-24)">
+        <circle cx="-12" r="10" fill="none" stroke="#b3a06a" stroke-width="5"/>
+        <path d="M-2 0h31m-7 0v8m7-8v6" fill="none" stroke="#b3a06a" stroke-width="5" stroke-linecap="round"/>
+        <path d="m-17-4 7-3" stroke="#e3d7a5" stroke-width="1.5"/>
+      </g>`)));
+    if(f.backdoor) artwork += anchor('enterhouse',683,513,freeRoute(683,513,'up',.77));
+  } else if(room === 'tea') artwork = freeTeaRoom(view,anchor);
+  else if(room === 'table') artwork = freeTableRoom(view,anchor);
+  const targets = [...new Set(view.availableActions || [])].map(id=>anchors.get(id)).filter(Boolean)
+    .map(({worldX,worldY,...target})=>target);
+  const markerMetadata = targets.map(item => {
+    const world = anchors.get(item.id);
+    return '<g data-action="' + item.id + '" data-x="' + item.x + '" data-y="' + item.y +
+      '" data-world-x="' + world.worldX + '" data-world-y="' + world.worldY + '"/>';
+  }).join('');
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" data-exploration="' + view.location + '" data-room="' + room + '" data-pose="' + pose + '">' +
+    '<defs>' + gradients + '</defs>' + motionStyle +
+    '<rect width="1200" height="800" fill="' + backgrounds[view.chapter] + '"/>' +
+    '<g data-camera="' + pose + '" transform="translate(' + camera.x + ' ' + camera.y + ') scale(' + camera.scale + ')">' +
+    '<g data-fixed-room="' + room + '">' + artwork + '</g></g>' + markerMetadata +
+    '<rect width="1200" height="800" fill="url(#r04-edge)" pointer-events="none"/></svg>';
+  return {svg,targets};
+}
+
+

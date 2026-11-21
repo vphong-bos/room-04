@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#eff0e7">
-  <meta name="description" content="From the road, the house has one floor.">
+  <meta name="description" content="A thank-you to friends and an invitation to graduation at UIT.">
   <meta property="og:title" content="Room 04">
-  <meta property="og:description" content="Room 04.">
+  <meta property="og:description" content="A thank-you to friends and an invitation to graduation at UIT.">
   <title>Room 04</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
@@ -14,10 +14,9 @@
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
-  <main id="adventure" aria-label="Room 04, a quiet discovery game">
+  <main id="adventure" aria-label="Room 04, a graduation invitation">
     <div id="world" aria-hidden="true"></div>
     <div id="paper-world" aria-hidden="true" hidden></div>
-    <div class="atmosphere" aria-hidden="true"></div>
     <div id="object-targets" class="object-targets" role="group" aria-label="Objects in this room"></div>
     <div id="scene-veil" class="scene-veil" aria-hidden="true"></div>
     <div class="quiet-controls" role="group" aria-label="Preferences and sources">
@@ -25,38 +24,42 @@
       <button id="preferences-button" class="icon-button" type="button" aria-label="Open preferences"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2 2m8.8 8.8 2 2m0-12.8-2 2m-8.8 8.8-2 2"/><circle cx="12" cy="12" r="4"/></svg></button>
       <button id="sources-button" class="icon-button" type="button" aria-label="The things borrowed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h11v15H7a3 3 0 0 1 0-6h11M7 4a3 3 0 0 0-3 3v9m5-8h6m-6 3h4"/></svg></button>
     </div>
-    <p id="whisper" class="whisper" aria-hidden="true"></p>
+    <p id="feedback-line" class="feedback-line" aria-hidden="true" hidden></p>
     <p id="announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
     <div id="loading" class="loading" aria-label="Opening Room 04"><span class="loading-mark" aria-hidden="true"></span></div>
     <button id="reopen-letter" class="found-letter" type="button" aria-label="Look at the photograph again" hidden><span id="reopen-label">Photograph</span><svg viewBox="0 0 36 28" aria-hidden="true"><rect x="2" y="3" width="32" height="23" rx="1"/><path d="M5 21V7h26v14zM6 20l8-8 8 8m-4-4 5-4 7 8"/></svg></button>
-    <aside id="gratitude-card" class="gratitude-card" aria-label="A note for you" hidden>
-      <div class="gratitude-heading">For you</div>
-      <button id="gratitude-dismiss" class="close-button" type="button" aria-label="Dismiss this message">×</button>
-      <p id="gratitude-message" class="gratitude-message" tabindex="0" aria-live="polite" aria-atomic="true"></p>
-    </aside>
   </main>
 
   <dialog id="photo-dialog" class="photo-dialog" aria-label="The photograph">
     <button class="close-button" data-close type="button" aria-label="Put the photograph down">×</button>
     <button id="turn-photo" class="photo-front" type="button" aria-label="Turn the photograph over">
-      <img id="found-photo" src="./assets/story/found-photograph.png" loading="lazy" width="1448" height="1086" alt="An old photograph, mostly covered by a sleeve. At the edge are part of a table, two cups and a hand.">
-      <svg class="photo-curl" viewBox="0 0 48 48" aria-hidden="true"><path d="M48 0v48H0Q31 44 48 0"/></svg>
+      <img id="found-photo" src="./assets/story/graduation-portrait.png" loading="lazy" width="1024" height="1536" alt="The graduate in a blue UIT cap and gown, holding a diploma.">
     </button>
     <button id="read-note" class="photo-read-button" type="button">Read the note</button>
   </dialog>
 
-  <dialog id="letter-dialog" class="letter-dialog" aria-label="A note on the back of the photograph">
-    <div class="letter-toolbar"><span>The note</span><button class="close-button" data-close type="button" aria-label="Back to the room">×</button></div>
-    <h1 id="letter-heading" hidden></h1>
-    <div id="letter-body" class="letter-body"></div>
-    <p id="letter-signoff" class="letter-signoff"></p>
-    <div id="letter-event" class="letter-event" hidden><p id="event-name"></p><p id="event-date"></p><p id="event-place"></p><p id="event-note"></p><div class="letter-actions"><a id="rsvp-link" hidden>RSVP</a><button id="calendar-button" type="button" hidden>Add to calendar</button><a id="map-link" hidden>Map</a></div></div>
+  <dialog id="letter-dialog" class="letter-dialog" aria-label="Graduation invitation on the back of the photograph">
+    <div class="letter-toolbar"><span>Graduation invitation</span><button class="close-button" data-close type="button" aria-label="Back to the room">×</button></div>
+    <div class="letter-intro">
+      <span class="graduation-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m5 18 19-9 19 9-19 9z"/><path d="M13 23v10c7 5 15 5 22 0V23M42 19v14"/><circle cx="42" cy="36" r="2"/></svg></span>
+      <h1 id="letter-heading" hidden></h1>
+      <div id="letter-body" class="letter-body"></div>
+      <p id="letter-signoff" class="letter-signoff"></p>
+    </div>
+    <div id="letter-event" class="letter-event" hidden>
+      <p id="event-name" lang="vi"></p>
+      <p id="event-date" lang="vi"></p>
+      <p id="event-place" lang="vi"></p>
+      <p id="event-note"></p>
+      <div class="letter-actions"><a id="rsvp-link" hidden>RSVP</a><button id="calendar-button" type="button" hidden>Add to calendar</button><a id="map-link" hidden>Open UIT in Google Maps</a></div>
+    </div>
     <div class="letter-footer"><button id="note-close" type="button">Back to the room</button><button id="show-photo-front" type="button">View photograph</button></div>
   </dialog>
 
   <dialog id="preferences-dialog" class="small-dialog" aria-labelledby="preferences-heading">
     <button class="close-button" data-close type="button" aria-label="Close preferences">×</button>
     <h2 id="preferences-heading">Settings</h2>
+    <p class="preference-note">In the 3D view, drag to look around and use the circles to explore. Arrow keys also look around; Home faces forward.</p>
     <button id="motion-toggle" class="preference-row" type="button" aria-pressed="false"><span>Reduced motion</span><span class="toggle-track" aria-hidden="true"></span></button>
     <p id="motion-note" class="preference-note" hidden>Your device prefers reduced motion.</p>
     <button id="paper-toggle" class="preference-row" type="button" aria-pressed="false"><span>Illustrated view</span><span class="toggle-track" aria-hidden="true"></span></button>
@@ -66,9 +69,9 @@
   <dialog id="sources-dialog" class="sources-dialog" aria-labelledby="sources-heading">
     <button class="close-button" data-close type="button" aria-label="Close the borrowed things">×</button>
     <h2 id="sources-heading">Sources</h2>
-    <p class="source-intro">Original scene geometry, with references from these artists.</p>
+    <p class="source-intro">Original rooms and locally embedded models, with references from these artists.</p>
     <div id="source-list" class="source-list"></div>
-    <p class="source-footnote">Original model viewers open on request. Preview images retain their creators’ licenses. Type: DM Sans, Caveat · SIL Open Font License. 3D engine: Three.js · MIT.</p>
+    <p class="source-footnote">Original model viewers open on request. Preview images retain their creators’ licenses. The additional model meshes are stored locally under CC0. Type: DM Sans, Fraunces · SIL Open Font License. 3D engine: Three.js · MIT.</p>
   </dialog>
 
   <dialog id="model-dialog" class="model-dialog" aria-labelledby="model-heading">

@@ -10,7 +10,32 @@ const labels = Object.freeze({
   fold:'Fold the cardboard', sit:'Sit on the bench',
 });
 
+const freeLabels={
+  frontdoor:'Try the locked front door',sidepath:'Go around the house',returnfront:'Return to the front',
+  key:'Pick up the back-door key',enterhouse:'Go through the open door',outside:'Go back outside',
+  tea:'Make a cup of tea',cup:'Make a cup of tea',window:'Look through the open window',
+  left:'Follow the hallway to the table',returntea:'Return to the tea room',
+  towel:'Dry yourself with the towel',room:'Go into the next room',chest:'Open the treasure chest',
+  photo:'Pick up the letter',turnphoto:'Read the invitation',cardboard:'Take the cardboard',
+  fold:'Steady the bench with folded cardboard',sit:'Sit at the table',
+  returnroom:'Stand up',duck:'Look at the tiny duck',flower:'Look at the flower',
+  boat:'Look at the little boat',jar:'Look at the glass bottle',windmill:'Look at the windmill',star:'Look at the little star',
+};
+export function actionLabel(view,id){
+  if(!view?.freeExploration)return id===view?.activeAction?interactionHint(view)?.label||labels[id]||id:labels[id]||id;
+  const flags=view.flags||{};
+  if(id==='backdoor')return flags.backdoor?'Look at the open back door':flags.key?'Unlock the back door':'Try the back-door lock';
+  if(id==='tea'||id==='cup')return view.location==='tea'&&!flags.tea?'Make a cup of tea':'Look at the cup of tea';
+  if(id==='towel')return view.wet?'Dry yourself with the towel':'Look at the dry towel';
+  if(id==='room'&&view.wet)return 'Dry off before entering the next room';
+  if(id==='chest')return flags.chest?'Look inside the small box':'Open the small box';
+  if(id==='photo'&&flags.photo)return 'Look at the graduation portrait';
+  if(id==='returntea'&&view.location==='window')return 'Step back from the window';
+  return freeLabels[id]||labels[id]||id;
+}
+
 export function interactionHint(view) {
+  if(view?.freeExploration)return view.focusAction?{id:view.focusAction,label:actionLabel(view,view.focusAction)}:null;
   if (!view?.activeAction) return null;
   const {activeAction:id,step}=view;
   let label=labels[id];
@@ -21,21 +46,22 @@ export function interactionHint(view) {
   return label ? {id,label} : null;
 }
 
-const optionalParagraph = Object.freeze({
-  chair:1, sit:1, cup:9, tap:9, fan:5, tape:5, pattern:7,
-  fish:7, plates:5, hose:6, number:0, photo:7, turnphoto:7,
+const optionalSegment = Object.freeze({
+  chair:2, sit:2, cup:18, tap:18, fan:10, tape:10, pattern:14,
+  fish:14, plates:10, hose:13, number:0, photo:14, turnphoto:14,
 });
 
 export function gratitudeMessage(view, id, config = {}) {
   if (!view || !id) return null;
   const read = value => typeof value==='string'&&value.trim() ? value : null;
-  const fallback = read(config.letter?.[0]) || 'Thank you for being here.';
+  const fallback = read(config.interactionMessages?.[0]) || 'Thank you for being here.';
+  if(view.freeExploration)return null;
   if (id===view.activeAction && ACTIONS[view.chapter]?.[view.step]===id) {
     const index=ACTIONS.slice(0,view.chapter).reduce((count,actions)=>count+actions.length,0)+view.step;
     return read(config.interactionMessages?.[index]) || fallback;
   }
-  if (Object.hasOwn(optionalParagraph,id))
-    return read(config.letter?.[optionalParagraph[id]]) || fallback;
+  if (Object.hasOwn(optionalSegment,id))
+    return read(config.interactionMessages?.[optionalSegment[id]]) || fallback;
   return null;
 }
 

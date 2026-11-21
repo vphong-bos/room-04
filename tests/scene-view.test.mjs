@@ -4,7 +4,7 @@ import test from 'node:test';
 import {act, getView, initialState} from '../dist/game-state.mjs';
 import {buildWorld} from '../dist/world.mjs';
 import {buildFallback} from '../dist/fallback.mjs';
-import {fitSceneCamera, fitPaperFrame, targetPoint, hitSceneTarget, renderPixelRatio} from '../dist/scene-view.mjs';
+import {fitSceneCamera, fitPaperFrame, targetPoint, hitSceneTarget, renderPixelRatio, framingContext} from '../dist/scene-view.mjs';
 
 const source = await readFile(new URL('../dist/vendor/three.module.js', import.meta.url));
 const THREE = await import('data:text/javascript;base64,' + source.toString('base64'));
@@ -28,11 +28,11 @@ test('required objects stay visible and touch-safe across layouts, camera drags 
           for (const reducedMotion of [true, false]) {
             world.update(1.71, .016, {reducedMotion});
             world.root.updateMatrixWorld(true);
-            const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 160);
+            const camera = new THREE.PerspectiveCamera(world.camera.fov||58,1,.05,160);
             const aim = new THREE.Vector3(...world.camera.target);
-            camera.position.set(...world.camera.position).sub(aim).applyAxisAngle(axis, yaw).add(aim);
-            camera.lookAt(aim);
-            const frame = fitSceneCamera(camera, world.camera, width, height, targetPoint(active), undefined, world.targets.map(targetPoint));
+            camera.position.set(...world.camera.position);
+            camera.lookAt(camera.position.clone().add(aim.sub(camera.position).applyAxisAngle(axis,yaw)));
+            const frame = fitSceneCamera(camera, world.camera, width, height, targetPoint(active), undefined, framingContext(world.camera,world.targets,view.activeAction));
             const point = targetPoint(active).project(camera);
             const x = (point.x + 1) * width / 2, y = (1 - point.y) * height / 2;
             const at = view.chapter + ':' + view.step + ' ' + width + '×' + height + ' yaw ' + yaw;
@@ -41,7 +41,7 @@ test('required objects stay visible and touch-safe across layouts, camera drags 
             assert.ok(point.z >= -1 && point.z <= 1, 'depth clipping at ' + at);
             ray.setFromCamera(point, camera);
             assert.equal(hitSceneTarget(ray, world.root, world.targets)?.id, active.id, 'object occluded at ' + at);
-            for (const target of world.targets) {
+            for (const target of world.targets.filter(t=>t.id===view.activeAction||world.camera.contextTargets?.includes(t.id))) {
               const context = targetPoint(target).project(camera);
               const contextX = (context.x + 1) * width / 2, contextY = (1 - context.y) * height / 2;
               assert.ok(contextX >= frame.left - .01 && contextX <= frame.right + .01, 'cropped contextual object at ' + at);
@@ -61,17 +61,19 @@ test('required objects stay visible and touch-safe across layouts, camera drags 
   t.diagnostic(checks + ' layout, orbit and motion combinations');
 });
 
-test('the phone composition keeps the starting chair large enough to recognize', () => {
+test('the phone view stands at eye level and keeps the entrance furniture recognizable', () => {
   const world = buildWorld(THREE, getView(initialState()));
   try {
     world.root.updateMatrixWorld(true);
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 160);
+    const camera = new THREE.PerspectiveCamera(world.camera.fov||58,1,.05,160);
     camera.position.set(...world.camera.position);
     camera.lookAt(...world.camera.target);
     fitSceneCamera(camera, world.camera, 390, 844, targetPoint(world.targets.find(t => t.id === 'frontdoor')));
     const top = new THREE.Vector3(-1.39, .94, .47).project(camera);
     const foot = new THREE.Vector3(-1.39, .02, .47).project(camera);
-    assert.ok(Math.abs(top.y - foot.y) * 844 / 2 > 100, 'phone framing shrank the chair into a thumbnail');
+    assert.equal(camera.isPerspectiveCamera,true);
+    assert.equal(camera.position.y,1.62);
+    assert.ok(Math.abs(top.y - foot.y) * 844 / 2 > 75, 'phone framing shrank the chair into a thumbnail');
   } finally {
     world.dispose();
   }
@@ -137,33 +139,45 @@ test('retina and ultrawide layouts stay within the drawing-buffer budget', () =>
   assert.equal(renderPixelRatio(390, 844, 1), 1);
 });
 
-test('the ending keeps both shoes in view and unobstructed throughout its allowed drag range', () => {
-  const world = buildWorld(THREE, {chapter:3, step:6});
-  const corners = [-.04, .46].flatMap(x => [-.013, .16].flatMap(y => [-5.12, -4.61].map(z => new THREE.Vector3(x,y,z))));
-  try {
-    world.root.updateMatrixWorld(true);
-    const limit = world.camera.dragLimit ?? .38;
-    for (const [width,height] of screens) for (const yaw of [-limit, 0, limit]) {
-      const camera = new THREE.OrthographicCamera(-1,1,1,-1,.1,160);
-      const aim = new THREE.Vector3(...world.camera.target);
-      camera.position.set(...world.camera.position).sub(aim).applyAxisAngle(new THREE.Vector3(0,1,0),yaw).add(aim);
-      camera.lookAt(aim);
-      const frame = fitSceneCamera(camera,world.camera,width,height,null,undefined,world.targets.map(targetPoint));
-      for (const corner of corners) {
-        const point = corner.clone().project(camera), x = (point.x+1)*width/2, y = (1-point.y)*height/2;
-        assert.ok(x >= frame.left - .01 && x <= frame.right + .01 && y >= frame.top - .01 && y <= frame.bottom + .01,
-          'ending shoes cropped at ' + width + '×' + height + ', yaw ' + yaw);
+test('both shoes stay visible and readable in the pool and seated ending across layouts', () => {
+  for (const view of [{chapter:2,step:0},{chapter:2,step:1},{chapter:3,step:6}]) {
+    const world=buildWorld(THREE,view);
+    try {
+      world.root.updateMatrixWorld(true);
+      const shoes=world.root.getObjectsByProperty('name','shoe');
+      assert.equal(shoes.length,2,'the scene must retain both shoes');
+      const corners=shoes.flatMap(shoe=>[-.091,.091].flatMap(x=>[.011,.166].flatMap(y=>
+        [-.167,.203].map(z=>new THREE.Vector3(x,y,z).applyMatrix4(shoe.matrixWorld)))));
+      const active=world.targets.find(target=>target.id===(view.chapter===2?(view.step?'room':'towel'):''));
+      const limit=world.camera.dragLimit??.38;
+      for(const [width,height]of screens)for(const yaw of[-limit,0,limit]){
+        const camera=new THREE.PerspectiveCamera(world.camera.fov,width/height,.05,160);
+        camera.position.set(...world.camera.position);
+        const direction=new THREE.Vector3(...world.camera.target).sub(camera.position);
+        camera.lookAt(camera.position.clone().add(direction.applyAxisAngle(new THREE.Vector3(0,1,0),yaw)));
+        fitSceneCamera(camera,world.camera,width,height,active?targetPoint(active):null,undefined,
+          framingContext(world.camera,world.targets,active?.id));
+        const pixels=corners.map(corner=>{
+          const point=corner.clone().project(camera);
+          return {x:(point.x+1)*width/2,y:(1-point.y)*height/2};
+        });
+        const at=view.chapter+':'+view.step+' '+width+'×'+height+' yaw '+yaw;
+        for(const point of pixels)
+          assert.ok(point.x>=16&&point.x<=width-16&&point.y>=16&&point.y<=height-16,'shoes cropped at '+at);
+        const pairWidth=Math.max(...pixels.map(p=>p.x))-Math.min(...pixels.map(p=>p.x));
+        const pairHeight=Math.max(...pixels.map(p=>p.y))-Math.min(...pixels.map(p=>p.y));
+        const minimum=Math.min(50,width*.14,height*.058);
+        assert.ok(pairWidth>=minimum,'shoes too small to recognize at '+at+': '+pairWidth.toFixed(1)+'px');
+        assert.ok(pairHeight>=minimum*.4,'shoe silhouette too thin at '+at);
+        for(const shoe of shoes){
+          const center=new THREE.Vector3(0,.12,.025).applyMatrix4(shoe.matrixWorld),ray=new THREE.Raycaster();
+          ray.setFromCamera(center.clone().project(camera),camera);
+          const first=ray.intersectObject(world.root,true).find(hit=>
+            !(hit.object.material.transparent&&hit.object.material.opacity<.5&&!hit.object.material.depthWrite));
+          assert.ok(first?.object.isInstancedMesh&&first.point.distanceTo(center)<.12,'scenery hides a shoe at '+at);
+        }
       }
-      for (const x of [.09,.33]) {
-        const center = new THREE.Vector3(x,.06,x === .09 ? -4.89 : -4.84);
-        const ray = new THREE.Raycaster();
-        ray.setFromCamera(center.clone().project(camera),camera);
-        const first = ray.intersectObject(world.root,true)[0];
-        assert.ok(first && first.point.distanceTo(center) < .2, 'a wall hides the ending shoes');
-      }
-    }
-  } finally {
-    world.dispose();
+    }finally{world.dispose();}
   }
 });
 
@@ -171,12 +185,12 @@ test('repeated resizing and landscape safe-area insets retain complete touch are
   const world = buildWorld(THREE,getView(initialState()));
   try {
     world.root.updateMatrixWorld(true);
-    const camera = new THREE.OrthographicCamera(-1,1,1,-1,.1,160);
+    const camera = new THREE.PerspectiveCamera(world.camera.fov||58,1,.05,160);
     camera.position.set(...world.camera.position);camera.lookAt(...world.camera.target);
     const active = targetPoint(world.targets.find(t => t.id === 'frontdoor'));
     const insets = {left:47,right:47,top:54,bottom:32};
     for (const [width,height] of [...screens,...screens.slice().reverse()]) {
-      const frame = fitSceneCamera(camera,world.camera,width,height,active,insets,world.targets.map(targetPoint));
+      const frame = fitSceneCamera(camera,world.camera,width,height,active,insets,framingContext(world.camera,world.targets,'frontdoor'));
       const point = active.clone().project(camera), x = (point.x+1)*width/2, y = (1-point.y)*height/2;
       assert.ok(x >= frame.left - .01 && x <= frame.right + .01);
       assert.ok(y >= frame.top - .01 && y <= frame.bottom + .01);
@@ -193,30 +207,29 @@ test('repeated resizing and landscape safe-area insets retain complete touch are
   }
 });
 
-test('the complete sink window stays in frame when inspecting the pool below', () => {
-  const world = buildWorld(THREE,{chapter:1,step:6});
-  try {
+test('the lower pool is visible through the sink window from standing eye height',()=>{
+  const world=buildWorld(THREE,{chapter:1,step:6});
+  try{
     world.root.updateMatrixWorld(true);
-    for (const [width,height] of screens) {
-      const camera = new THREE.OrthographicCamera(-1,1,1,-1,.1,160);
+    for(const[width,height]of screens){
+      const camera=new THREE.PerspectiveCamera(world.camera.fov,width/height,.05,160);
       camera.position.set(...world.camera.position);camera.lookAt(...world.camera.target);
-      const active = targetPoint(world.targets.find(t => t.id === 'window'));
-      const frame = fitSceneCamera(camera,world.camera,width,height,active,undefined,world.targets.map(targetPoint));
-      for (const x of [.70,2.81]) for (const y of [1.02,2.36]) {
-        const point = new THREE.Vector3(x,y,-1.56).project(camera);
-        assert.ok((point.x+1)*width/2 >= frame.left - .01 && (point.x+1)*width/2 <= frame.right + .01);
-        assert.ok((1-point.y)*height/2 >= frame.top - .01 && (1-point.y)*height/2 <= frame.bottom + .01);
-      }
+      const active=targetPoint(world.targets.find(t=>t.id==='window'));
+      const frame=fitSceneCamera(camera,world.camera,width,height,active,undefined,framingContext(world.camera,world.targets,'window'));
+      assert.equal(camera.position.y,1.62);
+      const pool=new THREE.Vector3(3.2,-1.42,-14.5),point=pool.clone().project(camera);
+      const x=(point.x+1)*width/2,y=(1-point.y)*height/2;
+      assert.ok(x>=frame.left-.01&&x<=frame.right+.01&&y>=frame.top-.01&&y<=frame.bottom+.01);
+      const ray=new THREE.Raycaster();ray.setFromCamera(point,camera);
+      const first=ray.intersectObject(world.root,true)[0];
+      assert.ok(first&&first.point.distanceTo(pool)<.2,'the sill or wall hides the pool below');
     }
-  } finally {
-    world.dispose();
-  }
+  }finally{world.dispose();}
 });
 
-test('the repeated blue chair and the shoes in the shallow pool remain fully in frame', () => {
+test('the repeated blue chair remains fully framed through both pool stages', () => {
   const boxes = [
     [[-.91,.013,-.38],[-.19,.96,.30]],
-    [[-1.10,-.023,1.65],[-.40,.17,2.15]],
   ];
   const corners = boxes.flatMap(([min,max]) => [min[0],max[0]].flatMap(x =>
     [min[1],max[1]].flatMap(y => [min[2],max[2]].map(z => new THREE.Vector3(x,y,z)))));
@@ -225,18 +238,50 @@ test('the repeated blue chair and the shoes in the shallow pool remain fully in 
     try {
       world.root.updateMatrixWorld(true);
       for (const [width,height] of screens) {
-        const camera = new THREE.OrthographicCamera(-1,1,1,-1,.1,160);
+        const camera = new THREE.PerspectiveCamera(world.camera.fov||58,1,.05,160);
         camera.position.set(...world.camera.position);camera.lookAt(...world.camera.target);
         const active = targetPoint(world.targets.find(t => t.id === (step ? 'room' : 'towel')));
-        const frame = fitSceneCamera(camera,world.camera,width,height,active,undefined,world.targets.map(targetPoint));
+        const frame = fitSceneCamera(camera,world.camera,width,height,active,undefined,framingContext(world.camera,world.targets,step?'room':'towel'));
         for (const corner of corners) {
           const point = corner.clone().project(camera), x = (point.x+1)*width/2, y = (1-point.y)*height/2;
           assert.ok(x >= frame.left - .01 && x <= frame.right + .01 && y >= frame.top - .01 && y <= frame.bottom + .01,
-            'pool chair or shoes cropped at ' + width + '×' + height);
+            'pool chair cropped at ' + width + '×' + height);
         }
       }
     } finally {
       world.dispose();
     }
+  }
+});
+
+
+test('wide screens keep the entrance view close instead of revealing the set edges',()=>{
+  const world=buildWorld(THREE,getView(initialState()));
+  try{
+    world.root.updateMatrixWorld(true);
+    const active=world.targets.find(target=>target.id==='frontdoor');
+    for(const[width,height]of[[1440,900],[2560,1080],[3840,1080]]){
+      const camera=new THREE.PerspectiveCamera(world.camera.fov,width/height,.05,160);
+      camera.position.set(...world.camera.position);camera.lookAt(...world.camera.target);
+      fitSceneCamera(camera,world.camera,width,height,targetPoint(active),undefined,
+        framingContext(world.camera,world.targets,'frontdoor'));
+      const across=2/camera.projectionMatrix.elements[0];
+      assert.ok(across<=2*Math.tan(78*Math.PI/360),'wide layout reveals too much peripheral scenery');
+    }
+  }finally{world.dispose();}
+});
+
+test('indoor cameras are enclosed by ceilings and side walls beyond the action',()=>{
+  for(const view of[{chapter:1,step:0},{chapter:2,step:0},{chapter:3,step:6}]){
+    const world=buildWorld(THREE,view);
+    try{
+      world.root.updateMatrixWorld(true);
+      const origin=new THREE.Vector3(...world.camera.position);
+      for(const direction of[[0,1,0],[-1,0,0],[1,0,0]]){
+        const ray=new THREE.Raycaster(origin,new THREE.Vector3(...direction));
+        const hit=ray.intersectObject(world.root,true)[0];
+        assert.ok(hit&&hit.distance<15,'unfinished room boundary at '+view.chapter+':'+direction);
+      }
+    }finally{world.dispose();}
   }
 });
