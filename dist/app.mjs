@@ -29,6 +29,9 @@ let viewport = {width:0, height:0, insets:{}}, paperFrame, resizeRequest;
 let audioContext, ambientTimer, activeOscillators = new Set();
 const host = $('world');
 const root = $('adventure');
+let modeChosen=false,fallbackAnnounced=false;
+let resolveViewChoice;
+const viewChoice=new Promise(resolve=>{resolveViewChoice=resolve;});
 
 function save() { try { localStorage.setItem(SAVE_KEY, serialize(state)); } catch {} }
 function savePreferences() { try { localStorage.setItem(PREF_KEY, JSON.stringify(preferences)); } catch {} }
@@ -50,6 +53,36 @@ function showFeedback(message,duration=2400){
     feedbackHideTimer=setTimeout(()=>{line.hidden=true;line.textContent='';},450);
   },duration);
 }
+function announceIllustratedFallback(){
+  if(fallbackAnnounced)return;
+  fallbackAnnounced=true;
+  showFeedback('3D unavailable. Showing illustrated view.');
+}
+function handleContextLoss(event){
+  event.preventDefault();
+  const was3D=!preferences.paper;
+  webglAvailable=false;preferences.paper=true;applyPreferences();installView(getView(state),true);
+  if(was3D)announceIllustratedFallback();
+}
+function chooseView(mode){
+  if(modeChosen||!['3d','illustrated'].includes(mode))return;
+  modeChosen=true;
+  preferences.paper=mode==='illustrated';savePreferences();
+  $('choose-red-pill').disabled=true;$('choose-blue-pill').disabled=true;
+  $('view-choice-status').textContent=mode==='3d'?'Opening the 3D view…':'Opening the illustrated view…';
+  $('view-choice-status').focus({preventScroll:true});
+  resolveViewChoice(mode);
+}
+function finishEntry(){
+  if(!modeChosen)return;
+  root.hidden=false;
+  drawView(getView(state),true);
+  root.inert=false;$('view-choice').hidden=true;
+  requestAnimationFrame(()=>returnToScene());
+}
+$('choose-red-pill').addEventListener('click',()=>chooseView('3d'));
+$('choose-blue-pill').addEventListener('click',()=>chooseView('illustrated'));
+
 function applyPreferences() {
   document.body.classList.toggle('motion-paused', quiet());
   $('motion-toggle').setAttribute('aria-pressed', String(quiet()));
@@ -328,7 +361,7 @@ function installView(next,immediate=false){
   },260);
 }
 function interact(id){
-  if(pending)return;
+  if(!modeChosen||pending)return;
   if(preferences.sound&&!audioContext)enableAudio();
   const before=getView(state),hadKeyboardFocus=$('object-targets').contains(document.activeElement)&&document.activeElement?.matches(':focus-visible');
   const result=act(state,id);state=result.state;
@@ -406,7 +439,7 @@ function targetAt(event){
   return hitSceneTarget(raycaster,world.root,targets);
 }
 host.addEventListener('pointerdown',event=>{
-  if(pending||!event.isPrimary||event.button!==0)return;
+  if(!modeChosen||pending||!event.isPrimary||event.button!==0)return;
   pointerStart={x:event.clientX,y:event.clientY,angle:dragGoal,pitch:pitchGoal,id:event.pointerId,dragged:false};
   host.setPointerCapture(event.pointerId);
 });
@@ -433,7 +466,7 @@ function cancelPointer(event){if(pointerStart?.id===event.pointerId)pointerStart
 host.addEventListener('pointercancel',cancelPointer);
 host.addEventListener('lostpointercapture',cancelPointer);
 document.addEventListener('keydown',event=>{
-  if(document.querySelector('dialog[open]'))return;
+  if(!modeChosen||document.querySelector('dialog[open]'))return;
   if(event.key==='Escape'){hideFeedback();return;}
   const yawLimit=cameraTarget?.dragLimit??.65,pitchLimit=cameraTarget?.pitchLimit??.28;
   if(event.key==='ArrowLeft')dragGoal=Math.max(-yawLimit,dragGoal-.12);
@@ -477,6 +510,8 @@ function animate(now){
 
 async function boot(){
   document.title=config.title||'Room 04';document.querySelector('meta[property="og:title"]').content=document.title;
+  const requestedView=await viewChoice;
+  let nativeUnavailable=false;
   applyPreferences();
   try{
     [THREE,{buildWorld}]=await Promise.all([import('./vendor/three.module.js'),import('./world.mjs')]);
@@ -490,14 +525,15 @@ async function boot(){
     const sun=new THREE.DirectionalLight(0xfff8e9,2.5);sun.position.set(-8,16,9);sun.castShadow=true;
     sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-15,right:15,top:15,bottom:-15,near:1,far:45});sun.shadow.bias=-.0007;sun.shadow.normalBias=.04;sun.shadow.radius=3;scene.add(sun);
     webglAvailable=true;
-    renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();webglAvailable=false;preferences.paper=true;applyPreferences();installView(getView(state),true);});
+    renderer.domElement.addEventListener('webglcontextlost',handleContextLoss);
   }catch(error){
     console.warn('Room 04 is using its paper view.',error instanceof Error?error.message:'Renderer unavailable');
-    renderer?.dispose();renderer=null;preferences.paper=true;applyPreferences();
+    renderer?.dispose();renderer=null;preferences.paper=true;nativeUnavailable=requestedView==='3d';applyPreferences();
   }
-  applyPreferences();drawView(getView(state),true);requestAnimationFrame(animate);
+  applyPreferences();finishEntry();requestAnimationFrame(animate);
+  if(nativeUnavailable)announceIllustratedFallback();
   $('loading').classList.add('is-ready');setTimeout(()=>$('loading').hidden=true,700);
 }
 boot().catch(error=>{
-  console.error(error);preferences.paper=true;renderer=null;drawView(getView(state),true);$('loading').hidden=true;applyPreferences();
+  console.error(error);preferences.paper=true;renderer=null;applyPreferences();finishEntry();$('loading').hidden=true;
 });

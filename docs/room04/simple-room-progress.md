@@ -30,3 +30,10 @@ Review probes: 1,866 canonical v4 states round-tripped; 787 accepted v3 states a
 ## Limits
 
 The native command node --test tests/*.test.mjs was invoked but bwrap fails before Node starts. Two unchanged positive calendar/link tests need URL/TextEncoder globals unavailable in the alternate executor. Native browser CSS, pointer delivery, WebGL lighting/shadows and frame rate remain unverified. No deployment was performed.
+
+
+## Opening view choice
+
+The entry screen asks for a pill before the scene loads or accepts interactions: red selects the 3D view, blue selects illustrated. It overrides a previously saved renderer preference while preserving gameplay progress. The choice is guarded against duplicate activation. The scene is hidden/inert until choice and startup complete, then receives keyboard focus. The entry section has safe-area spacing and independent scrolling for short screens. A failed or lost native renderer switches to illustrated with one short notice; a Blue selection stays quiet.
+
+The saved modules passed 106 compatibility checks, including seven new entry/mode/fallback cases. A fresh read-only review found no outstanding concrete issue after the context-loss notice was shared with the startup fallback. Native Node still fails before execution at bwrap; browser rendering and native WebGL event delivery remain unverified. No deployment was performed.

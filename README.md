@@ -17,6 +17,12 @@ Open http://localhost:8000. Stop with Ctrl+C. Use HTTP because the browser loads
 
 No Node, package install, API key, backend or build step is needed to run the site. Geometry, model meshes, fonts, portrait and illustrated artwork are local.
 
+## Choose a view
+
+At the start of each visit, choose a pill: **red opens the 3D view; blue opens the illustrated view**. The scene stays hidden and non-interactive until the choice is made and the view is ready. Choosing a mode keeps saved gameplay progress. Settings can switch views later; Start again keeps the current mode.
+
+If the 3D renderer is unavailable or loses its context, the game continues in illustrated mode with a short notice. The entry screen supports keyboard selection, safe-area insets and its own scrolling on short screens.
+
 ## Explore
 
 - The front door stays locked. Take the side path, find the key behind the house, unlock the back door, then choose its entrance circle.
@@ -125,7 +131,7 @@ python3 -m unittest discover -s tests -p 'test_publish.py' -v
 bash -n scripts/publish.sh
 ```
 
-The current host cannot start Node because bwrap cannot create a namespace. The saved modules passed **99 compatibility test bodies** with the real vendored Three. These cover state, save migration, controller timing, layout continuity, target rays, resources and camera mathematics.
+The current host cannot start Node because bwrap cannot create a namespace. The saved modules passed **106 compatibility test bodies** with the real vendored Three. These cover state, save migration, controller timing, layout continuity, target rays, resources and camera mathematics.
 
 A separate state-to-scene playthrough checked 29 snapshots and 130 action rays with no missing or obstructed physical actions. Independent review probed canonical reachable states, previous-version migration and renderer switching.
 

@@ -14,7 +14,25 @@
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
-  <main id="adventure" aria-label="Room 04, a graduation invitation">
+  <section id="view-choice" class="view-choice" aria-labelledby="view-choice-heading" aria-describedby="view-choice-description">
+    <div class="view-choice-card">
+      <p class="view-choice-brand">Room 04</p>
+      <h1 id="view-choice-heading">Choose your pill.</h1>
+      <p id="view-choice-description">How would you like to explore?</p>
+      <div class="pill-options">
+        <button id="choose-red-pill" class="pill-option pill-option-red" type="button">
+          <span class="pill-swatch" aria-hidden="true"></span>
+          <span class="pill-label"><strong>Red pill</strong><span>3D view</span></span>
+        </button>
+        <button id="choose-blue-pill" class="pill-option pill-option-blue" type="button">
+          <span class="pill-swatch" aria-hidden="true"></span>
+          <span class="pill-label"><strong>Blue pill</strong><span>Illustrated view</span></span>
+        </button>
+      </div>
+      <p id="view-choice-status" class="view-choice-status" role="status" tabindex="-1"></p>
+    </div>
+  </section>
+  <main id="adventure" aria-label="Room 04, a graduation invitation" hidden inert>
     <div id="world" aria-hidden="true"></div>
     <div id="paper-world" aria-hidden="true" hidden></div>
     <div id="object-targets" class="object-targets" role="group" aria-label="Objects in this room"></div>
